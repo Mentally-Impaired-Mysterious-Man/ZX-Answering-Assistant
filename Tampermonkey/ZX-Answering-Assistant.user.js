@@ -6,6 +6,7 @@
 // @author       You
 // @match        https://ai.cqzuxia.com/#/evaluation/knowledge-detail/*
 // @match        *://admin.cqzuxia.com/*
+// @match        *://*.cqzuxia.com/*
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        none
@@ -182,11 +183,19 @@
 
     // ========== 标准化题目（用于模糊匹配）==========
     function normalize(str) {
-        return str.replace(/\s+/g, '')
-            .replace(/[（）【】$、]/g, '')
-            .replace(/\.|\s/g, '')
-            .replace(/`/g, '')
-            .toLowerCase();
+        // 创建一个临时div元素来解析HTML实体编码
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = str;
+        const decodedStr = tempDiv.textContent || tempDiv.innerText || str;
+        
+        // 处理特殊符号和空白字符
+        return decodedStr
+            .replace(/\s+/g, '') // 合并空白字符
+            .replace(/[（）【】$、，。！？；：""''《》〈〉【】〔〕]/g, '') // 移除中文标点
+            .replace(/[(){}[\]<>"'.,;:!?]/g, '') // 移除英文标点
+            .replace(/`/g, '') // 移除反引号
+            .replace(/[·•…—–]/g, '') // 移除特殊符号
+            .toLowerCase(); // 转换为小写
     }
 
     // ========== 创建浮动按钮 ==========
@@ -306,6 +315,7 @@
                 <div id="answer-tab" class="tab-pane">
                     <textarea id="kb-input" placeholder="粘贴题库文本（支持足下教育标准格式）" style="width:100%; height:100px; margin-bottom:8px; padding:6px; border:1px solid #ccc; border-radius:4px; font-family:monospace; font-size:13px;"></textarea>
                     <button id="parse-btn" style="width:100%; padding:6px; background:#409eff; color:white; border:none; border-radius:4px; margin-bottom:8px;">✅ 解析题库</button>
+                    <button id="manual-auto-select-btn" style="width:100%; padding:8px; background:#9C27B0; color:white; border:none; border-radius:4px; margin-bottom:8px; position:relative; overflow:hidden; transition:all 0.3s ease; box-shadow:0 2px 5px rgba(156,39,176,0.3);">🎯 手动触发自动选择</button>
                     <div id="kb-count" style="margin-bottom:6px; color:#666; font-size:12px;"></div>
                     <div id="kb-full-list" style="font-size:12px; max-height:200px; overflow:auto; border:1px solid #eee; padding:6px; border-radius:4px; background:#fafafa;"></div>
                 </div>
@@ -393,6 +403,58 @@
         // 题目提取相关事件
         panel.querySelector('#auto-browse-btn').onclick = () => {
             showSpeedSettingsDialog();
+        };
+
+        // 手动触发自动选择按钮事件
+        panel.querySelector('#manual-auto-select-btn').onclick = function(e) {
+            // 添加波纹动画效果
+            this.classList.add('ripple');
+            setTimeout(() => {
+                this.classList.remove('ripple');
+            }, 600);
+            
+            // 添加点击动画效果
+            this.style.transform = 'scale(0.95)';
+            this.style.boxShadow = '0 1px 3px rgba(156,39,176,0.5)';
+            
+            setTimeout(() => {
+                this.style.transform = 'scale(1)';
+                this.style.boxShadow = '0 2px 5px rgba(156,39,176,0.3)';
+            }, 150);
+            
+            // 检查当前页面是否有题目
+            const titleEl = document.querySelector('.question-title');
+            if (!titleEl) {
+                showNotification('当前页面没有检测到题目，请先进入答题页面', 'warning');
+                return;
+            }
+            
+            const qText = titleEl.textContent.trim();
+            if (!qText) {
+                showNotification('无法获取题目内容，请刷新页面后重试', 'warning');
+                return;
+            }
+            
+            // 查找匹配的答案
+            let matchedQ = null, ans = null;
+            const normQ = normalize(qText);
+            for (const [q, a] of Object.entries(KNOWLEDGE_BASE)) {
+                const normKB = normalize(q);
+                // 增强模糊匹配：允许子串匹配
+                if (normQ.includes(normKB) || normKB.includes(normQ)) {
+                    matchedQ = q;
+                    ans = a;
+                    break;
+                }
+            }
+            
+            if (ans) {
+                // 显示确认对话框
+                showModal(qText, matchedQ, ans);
+                showNotification('已找到匹配答案，请查看确认对话框', 'success');
+            } else {
+                showNotification('未在题库中找到匹配的答案', 'error');
+            }
         };
 
         panel.querySelector('#show-questions-btn').onclick = () => {
@@ -1913,7 +1975,45 @@
             return document.getElementById('question-toggle-btn');
         }
 
-        // 添加按钮样式
+        // 添加手动触发自动选择按钮的悬停效果和波纹动画
+        const buttonStyle = document.createElement('style');
+        buttonStyle.textContent = `
+            #manual-auto-select-btn {
+                background: linear-gradient(135deg, #9C27B0, #7B1FA2) !important;
+                position: relative !important;
+                overflow: hidden !important;
+            }
+            
+            #manual-auto-select-btn:hover {
+                background: linear-gradient(135deg, #8E24AA, #6A1B9A) !important;
+                transform: translateY(-2px) !important;
+                box-shadow: 0 4px 8px rgba(156,39,176,0.4) !important;
+            }
+            
+            #manual-auto-select-btn:active {
+                transform: translateY(0) !important;
+                box-shadow: 0 2px 4px rgba(156,39,176,0.4) !important;
+            }
+            
+            #manual-auto-select-btn::before {
+                content: "" !important;
+                position: absolute !important;
+                top: 50% !important;
+                left: 50% !important;
+                width: 0 !important;
+                height: 0 !important;
+                border-radius: 50% !important;
+                background: rgba(255, 255, 255, 0.5) !important;
+                transform: translate(-50%, -50%) !important;
+                transition: width 0.6s, height 0.6s !important;
+            }
+            
+            #manual-auto-select-btn.ripple::before {
+                width: 300px !important;
+                height: 300px !important;
+            }
+        `;
+        document.head.appendChild(buttonStyle);
         const style = document.createElement('style');
         style.textContent = `
             #question-toggle-btn {
