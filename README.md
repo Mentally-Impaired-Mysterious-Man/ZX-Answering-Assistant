@@ -44,7 +44,7 @@
 ### 第一步：安装油猴（Tampermonkey）
 
 1. 打开浏览器（推荐 Chrome / Edge / Firefox）
-2. 访问 [Tampermonkey 官网](https://www.tampermonkey.net/)
+2. 访问 [Edge 扩展 下载 暴力猴](https://microsoftedge.microsoft.com/addons/detail/%E6%9A%B4%E5%8A%9B%E7%8C%B4/eeagobfjdenkkddmbclomhiblgggliao)
 3. 点击对应浏览器的安装按钮，将扩展添加到浏览器
 
 > 安装后，浏览器右上角会出现 🦒 图标。
