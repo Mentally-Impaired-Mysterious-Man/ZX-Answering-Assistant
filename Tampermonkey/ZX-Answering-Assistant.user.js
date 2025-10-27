@@ -183,10 +183,106 @@
 
     // ========== 标准化题目（用于模糊匹配）==========
     function normalize(str) {
+        // 保存原始字符串，用于检测是否包含原始HTML实体
+        const originalStr = str;
+        
         // 创建一个临时div元素来解析HTML实体编码
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = str;
-        const decodedStr = tempDiv.textContent || tempDiv.innerText || str;
+        let decodedStr = tempDiv.textContent || tempDiv.innerText || str;
+        
+        // 提取原文中的所有HTML实体
+        const originalEntities = originalStr.match(/&[a-zA-Z]+;/g) || [];
+        
+        // 提取解码后的所有HTML实体
+        const decodedEntities = decodedStr.match(/&[a-zA-Z]+;/g) || [];
+        
+        // 找出哪些实体在解码后仍然存在（这些很可能是原文中原本就有的）
+        const persistentEntities = decodedEntities.filter(entity => originalEntities.includes(entity));
+        
+        // 找出哪些实体在解码后消失了（这些很可能是后期提取过程中产生的）
+        const extractedEntities = originalEntities.filter(entity => !decodedEntities.includes(entity));
+        
+        // 如果没有原文实体，但解码后有实体，说明是后期提取过程中产生的，需要解码
+        if (originalEntities.length === 0 && decodedEntities.length > 0) {
+            // 解码所有HTML实体
+            decodedStr = decodedStr
+                .replace(/&quot;/g, '"')
+                .replace(/&apos;/g, "'")
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&amp;/g, '&')
+                .replace(/&nbsp;/g, ' ')
+                .replace(/&ldquo;/g, '"')
+                .replace(/&rdquo;/g, '"')
+                .replace(/&lsquo;/g, "'")
+                .replace(/&rsquo;/g, "'")
+                .replace(/&mdash;/g, '—')
+                .replace(/&ndash;/g, '–')
+                .replace(/&hellip;/g, '…')
+                .replace(/&middot;/g, '·');
+        }
+        // 如果原文和解码后都有实体，需要精确处理
+        else if (originalEntities.length > 0 && decodedEntities.length > 0) {
+            // 混合情况：部分实体是原文的，部分是后期提取的
+            
+            // 1. 先处理那些肯定是后期提取的实体（通过重新解码检测）
+            // 创建一个临时字符串，只包含解码后的内容
+            const tempDecoded = document.createElement('div');
+            tempDecoded.innerHTML = decodedStr;
+            const reDecodedStr = tempDecoded.textContent || tempDecoded.innerText || decodedStr;
+            
+            // 如果重新解码还有变化，说明还有后期提取的实体
+            if (reDecodedStr !== decodedStr) {
+                // 解码常见的后期提取实体（但保留编程相关的实体）
+                decodedStr = decodedStr
+                    .replace(/&quot;/g, '"')
+                    .replace(/&apos;/g, "'")
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>')
+                    .replace(/&amp;/g, '&')
+                    .replace(/&nbsp;/g, ' ')
+                    .replace(/&ldquo;/g, '"')
+                    .replace(/&rdquo;/g, '"')
+                    .replace(/&lsquo;/g, "'")
+                    .replace(/&rsquo;/g, "'")
+                    .replace(/&mdash;/g, '—')
+                    .replace(/&ndash;/g, '–')
+                    .replace(/&hellip;/g, '…')
+                    .replace(/&middot;/g, '·');
+            }
+            
+            // 2. 检查是否是编程题目，如果是，保留编程相关的实体
+            const isProgrammingQuestion = /代码|编程|javascript|js|html|css|python|java|c\+\+|sql|xml|json/i.test(decodedStr);
+            
+            if (isProgrammingQuestion) {
+                // 如果是编程题目，只解码引号实体，其他保留
+                // 但需要先恢复那些被错误解码的编程实体
+                const programmingEntities = ['&lt;', '&gt;', '&amp;', '&quot;'];
+                
+                // 检查这些实体是否在原文中存在
+                for (const entity of programmingEntities) {
+                    if (originalEntities.includes(entity)) {
+                        // 如果原文中有这个实体，我们需要在解码后的字符串中恢复它
+                        const replacement = {
+                            '&lt;': '<',
+                            '&gt;': '>',
+                            '&amp;': '&',
+                            '&quot;': '"'
+                        }[entity];
+                        
+                        // 将解码后的字符替换回实体编码
+                        decodedStr = decodedStr.replace(new RegExp('\\' + replacement, 'g'), entity);
+                    }
+                }
+            }
+            
+            // 所有选项处理完成后，验证选项是否真正被勾选
+            setTimeout(() => {
+                verifyOptionSelection(answerKey, true);
+            }, 500);
+        }
+        // 如果原文有实体，但解码后没有，说明已经完全解码，不需要额外处理
         
         // 处理特殊符号和空白字符
         return decodedStr
@@ -435,16 +531,44 @@
                 return;
             }
             
-            // 查找匹配的答案
+            // 查找匹配的答案 - 使用三轮匹配策略
             let matchedQ = null, ans = null;
             const normQ = normalize(qText);
+            
+            // 第一轮：标准化匹配（原逻辑）
             for (const [q, a] of Object.entries(KNOWLEDGE_BASE)) {
                 const normKB = normalize(q);
-                // 增强模糊匹配：允许子串匹配
                 if (normQ.includes(normKB) || normKB.includes(normQ)) {
                     matchedQ = q;
                     ans = a;
                     break;
+                }
+            }
+            
+            // 第二轮：HTML实体解码后的匹配
+            if (!ans && qText.includes('&')) {
+                const decodedQ = qText.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+                const normDecodedQ = normalize(decodedQ);
+                for (const [q, a] of Object.entries(KNOWLEDGE_BASE)) {
+                    const normKB = normalize(q);
+                    if (normDecodedQ.includes(normKB) || normKB.includes(normDecodedQ)) {
+                        matchedQ = q;
+                        ans = a;
+                        break;
+                    }
+                }
+            }
+            
+            // 第三轮：题库题目HTML实体解码匹配
+            if (!ans) {
+                for (const [q, a] of Object.entries(KNOWLEDGE_BASE)) {
+                    const decodedKB = q.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+                    const normDecodedKB = normalize(decodedKB);
+                    if (normQ.includes(normDecodedKB) || normDecodedKB.includes(normQ)) {
+                        matchedQ = q;
+                        ans = a;
+                        break;
+                    }
                 }
             }
             
@@ -642,11 +766,24 @@
         }
         // 多选题处理
         else if (answerKey.length > 1 && isMultipleChoice) {
-            const keys = answerKey.split('');
+            // 改进答案分割逻辑，正确处理分隔符
+            let keys = [];
+            // 尝试不同的分割方式
+            if (answerKey.includes('、') || answerKey.includes(',') || answerKey.includes('，')) {
+                // 如果包含分隔符，按分隔符分割
+                keys = answerKey.split(/[、,，]/).filter(k => k.trim());
+            } else {
+                // 如果没有分隔符，按字符分割
+                keys = answerKey.split('');
+            }
+            
             expectedSelections = keys.length;
-            for (const key of keys) {
+            
+            // 使用async/await处理多选题选项选择，确保每个选项都有足够时间被选中
+            const processMultiChoiceOption = async (key) => {
                 const options = document.querySelectorAll('.an-item .option-answer');
                 let found = false;
+                
                 for (const opt of options) {
                     const text = opt.textContent.trim();
                     // 匹配选项开头（A. 选项内容 → 匹配 "A"）
@@ -663,14 +800,17 @@
                                     success: true,
                                     description: '多选题选项'
                                 });
-                                break; // 选中一个选项后跳出内层循环
+                                
+                                // 添加延迟，确保选项被正确选中
+                                await new Promise(resolve => setTimeout(resolve, 300));
+                                return true; // 选中成功
                             } else if (input && input.checked) {
                                 selectionResults.push({
                                     key: key,
                                     success: true,
                                     description: '多选题选项(已选中)'
                                 });
-                                break;
+                                return true; // 已经选中
                             }
                         } catch (e) {
                             console.error('点击多选题选项失败:', e);
@@ -680,7 +820,7 @@
                                 description: '多选题选项',
                                 error: e.message
                             });
-                            break;
+                            return false;
                         }
                     }
                 }
@@ -693,11 +833,34 @@
                         error: '未找到匹配选项'
                     });
                 }
-            }
+                return false;
+            };
+            
+            // 顺序处理每个选项，确保前一个选项完全选中后再处理下一个
+            (async () => {
+                for (const key of keys) {
+                    await processMultiChoiceOption(key);
+                }
+                
+                // 所有选项处理完成后，验证选项是否真正被勾选
+                setTimeout(() => {
+                    verifyOptionSelection(answerKey, true);
+                }, 500);
+            })();
         }
         // 单选题处理
         else {
-            const keys = answerKey.split('');
+            // 改进答案分割逻辑，正确处理分隔符
+            let keys = [];
+            // 尝试不同的分割方式
+            if (answerKey.includes('、') || answerKey.includes(',') || answerKey.includes('，')) {
+                // 如果包含分隔符，按分隔符分割
+                keys = answerKey.split(/[、,，]/).filter(k => k.trim());
+            } else {
+                // 如果没有分隔符，按字符分割
+                keys = answerKey.split('');
+            }
+            
             expectedSelections = 1;
             for (const key of keys) {
                 // 优先尝试多选题选项（兼容题目类型错误的情况）
@@ -773,6 +936,11 @@
 
                 if (found) break;
             }
+            
+            // 选项处理完成后，验证选项是否真正被勾选
+            setTimeout(() => {
+                verifyOptionSelection(answerKey, false);
+            }, 500);
         }
 
         // 检查选择结果并使用统一通知函数提示
@@ -875,6 +1043,8 @@
 
                     let matchedQ = null, ans = null;
                     const normQ = normalize(qText);
+                    
+                    // 第一轮：标准化匹配
                     for (const [q, a] of Object.entries(KNOWLEDGE_BASE)) {
                         const normKB = normalize(q);
                         // 增强模糊匹配：允许子串匹配
@@ -882,6 +1052,51 @@
                             matchedQ = q;
                             ans = a;
                             break;
+                        }
+                    }
+                    
+                    // 第二轮：如果第一轮未匹配，尝试HTML实体解码后的匹配
+                    if (!ans && qText.includes('&')) {
+                        // 创建一个临时div元素来解码HTML实体
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = qText;
+                        const decodedQText = tempDiv.textContent || tempDiv.innerText || qText;
+                        
+                        if (decodedQText !== qText) {
+                            const normDecodedQ = normalize(decodedQText);
+                            
+                            for (const [q, a] of Object.entries(KNOWLEDGE_BASE)) {
+                                const normKB = normalize(q);
+                                
+                                if (normDecodedQ.includes(normKB) || normKB.includes(normDecodedQ)) {
+                                    matchedQ = q;
+                                    ans = a;
+                                    console.log('通过HTML实体解码匹配成功:', qText, '->', decodedQText);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 第三轮：尝试对题库中的题目也进行HTML实体解码匹配
+                    if (!ans) {
+                        for (const [q, a] of Object.entries(KNOWLEDGE_BASE)) {
+                            if (q.includes('&')) {
+                                const tempDiv = document.createElement('div');
+                                tempDiv.innerHTML = q;
+                                const decodedQ = tempDiv.textContent || tempDiv.innerText || q;
+                                
+                                if (decodedQ !== q) {
+                                    const normDecodedQ = normalize(decodedQ);
+                                    
+                                    if (normQ.includes(normDecodedQ) || normDecodedQ.includes(normQ)) {
+                                        matchedQ = q;
+                                        ans = a;
+                                        console.log('通过题库HTML实体解码匹配成功:', q, '->', decodedQ);
+                                        break;
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -932,6 +1147,122 @@
             // 没有确认对话框，直接开始观察
             startObserver();
         }
+    }
+
+    // ========== 检查选项是否真正被勾选 ==========
+    function verifyOptionSelection(answerKey, isMultipleChoice) {
+        // 改进答案分割逻辑，正确处理分隔符
+        let keys = [];
+        // 尝试不同的分割方式
+        if (answerKey.includes('、') || answerKey.includes(',') || answerKey.includes('，')) {
+            // 如果包含分隔符，按分隔符分割
+            keys = answerKey.split(/[、,，]/).filter(k => k.trim());
+        } else {
+            // 如果没有分隔符，按字符分割
+            keys = answerKey.split('');
+        }
+        
+        const notSelectedKeys = [];
+        
+        for (const key of keys) {
+            let found = false;
+            let isSelected = false;
+            
+            // 查找匹配的选项
+            const options = document.querySelectorAll('.an-item .option-answer');
+            for (const opt of options) {
+                const text = opt.textContent.trim();
+                if (text.startsWith(key)) {
+                    found = true;
+                    
+                    // 检查多选题选项是否被选中
+                    const checkboxInput = opt.closest('.el-checkbox')?.querySelector('input[type="checkbox"]');
+                    if (checkboxInput && checkboxInput.checked) {
+                        isSelected = true;
+                        break;
+                    }
+                    
+                    // 检查单选题选项是否被选中
+                    const radioInput = opt.closest('.el-radio')?.querySelector('input[type="radio"]');
+                    if (radioInput && radioInput.checked) {
+                        isSelected = true;
+                        break;
+                    }
+                    
+                    break;
+                }
+            }
+            
+            if (found && !isSelected) {
+                notSelectedKeys.push(key);
+            }
+        }
+        
+        // 如果有未被选中的选项，显示提示
+        if (notSelectedKeys.length > 0) {
+            const message = isMultipleChoice 
+                ? `以下多选题选项未被正确勾选，请手动检查：${notSelectedKeys.join('、')}`
+                : `答案选项未被正确勾选，请手动检查：${notSelectedKeys.join('、')}`;
+            
+            showNotification(message, 'warning', 5000);
+            
+            // 对于多选题，创建更显眼的提示框
+            if (isMultipleChoice && notSelectedKeys.length > 0) {
+                const answerHint = document.createElement('div');
+                answerHint.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
+                    color: white;
+                    padding: 20px 30px;
+                    border-radius: 12px;
+                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+                    z-index: 2147483647;
+                    font-size: 18px;
+                    font-weight: bold;
+                    text-align: center;
+                    animation: answerHintPulse 1.5s infinite;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                `;
+                
+                // 添加动画样式
+                const style = document.createElement('style');
+                style.textContent = `
+                    @keyframes answerHintPulse {
+                        0% { transform: translate(-50%, -50%) scale(1); }
+                        50% { transform: translate(-50%, -50%) scale(1.05); }
+                        100% { transform: translate(-50%, -50%) scale(1); }
+                    }
+                `;
+                document.head.appendChild(style);
+                
+                answerHint.innerHTML = `
+                    <div style="margin-bottom: 10px;">多选题选项未被正确勾选</div>
+                    <div style="font-size: 24px; letter-spacing: 5px;">${notSelectedKeys.join('、')}</div>
+                    <div style="margin-top: 15px; font-size: 14px; opacity: 0.9;">点击此提示框关闭</div>
+                `;
+                
+                document.body.appendChild(answerHint);
+                
+                // 点击提示框关闭
+                answerHint.addEventListener('click', function() {
+                    document.body.removeChild(answerHint);
+                });
+                
+                // 5秒后自动关闭
+                setTimeout(() => {
+                    if (document.body.contains(answerHint)) {
+                        document.body.removeChild(answerHint);
+                    }
+                }, 5000);
+            }
+            
+            return false;
+        }
+        
+        return true;
     }
 
     // ========== 显示速度设置对话框 ==========
@@ -3348,7 +3679,17 @@
         }
         // 多选题处理
         else if (answerKey.length > 1 && isMultipleChoice) {
-            const keys = answerKey.split('');
+            // 改进答案分割逻辑，正确处理分隔符
+            let keys = [];
+            // 尝试不同的分割方式
+            if (answerKey.includes('、') || answerKey.includes(',') || answerKey.includes('，')) {
+                // 如果包含分隔符，按分隔符分割
+                keys = answerKey.split(/[、,，]/).filter(k => k.trim());
+            } else {
+                // 如果没有分隔符，按字符分割
+                keys = answerKey.split('');
+            }
+            
             for (const key of keys) {
                 const options = document.querySelectorAll('.an-item .option-answer');
                 for (const opt of options) {
@@ -3366,13 +3707,28 @@
                         } catch (e) {
                             console.error('点击多选题选项失败:', e);
                         }
+                        }
                     }
                 }
+                
+                // 选项处理完成后，验证选项是否真正被勾选
+                setTimeout(() => {
+                    verifyOptionSelection(answerKey, false);
+                }, 500);
             }
-        }
         // 单选题处理
         else {
-            const keys = answerKey.split('');
+            // 改进答案分割逻辑，正确处理分隔符
+            let keys = [];
+            // 尝试不同的分割方式
+            if (answerKey.includes('、') || answerKey.includes(',') || answerKey.includes('，')) {
+                // 如果包含分隔符，按分隔符分割
+                keys = answerKey.split(/[、,，]/).filter(k => k.trim());
+            } else {
+                // 如果没有分隔符，按字符分割
+                keys = answerKey.split('');
+            }
+            
             for (const key of keys) {
                 // 优先尝试多选题选项（兼容题目类型错误的情况）
                 let options = document.querySelectorAll('.an-item .option-answer');
