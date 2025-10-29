@@ -294,6 +294,107 @@
             .toLowerCase(); // 转换为小写
     }
 
+    // ========== 公共函数 - 处理重复代码 ==========
+
+    // 统一的日志函数
+    function logSelection(action, key, mode) {
+        const modeText = mode ? `(${mode})` : '';
+        console.log(`✅ 已自动${action}: ${key} ${modeText}`);
+    }
+
+    // 智能分割答案键
+    function splitAnswerKey(answerKey) {
+        // 尝试不同的分割方式
+        if (answerKey.includes('、') || answerKey.includes(',') || answerKey.includes('，')) {
+            // 如果包含分隔符，按分隔符分割
+            return answerKey.split(/[、,，]/).filter(k => k.trim());
+        } else {
+            // 如果没有分隔符，按字符分割
+            return answerKey.split('');
+        }
+    }
+
+    // 查找所有选项
+    function findOptions() {
+        return document.querySelectorAll('.an-item .option-answer');
+    }
+
+    // 点击多选框选项
+    function clickCheckboxOption(optionElement, key) {
+        const input = optionElement.closest('.el-checkbox')?.querySelector('input[type="checkbox"]');
+        if (input && !input.checked) {
+            input.click();
+            if (key) {
+                logSelection('选择多选题选项', key);
+            }
+            return true;
+        } else if (input && input.checked && key) {
+            logSelection('多选题选项已选中', key);
+            return true;
+        }
+        return false;
+    }
+
+    // 点击单选框选项
+    function clickRadioOption(optionElement, key) {
+        const input = optionElement.closest('.el-radio')?.querySelector('input[type="radio"]');
+        if (input && !input.checked) {
+            input.click();
+            if (key) {
+                logSelection('选择单选题选项', key);
+            }
+            return true;
+        } else if (input && input.checked && key) {
+            logSelection('单选题选项已选中', key);
+            return true;
+        }
+        return false;
+    }
+
+    // 选择选项（整合查找和点击逻辑）
+    function selectOption(key, preferMultipleChoice = false) {
+        const options = findOptions();
+        
+        for (const opt of options) {
+            const text = opt.textContent.trim();
+            // 匹配选项开头（A. 选项内容 → 匹配 "A"）
+            if (text.startsWith(key)) {
+                try {
+                    // 根据偏好尝试不同类型的选项
+                    if (preferMultipleChoice) {
+                        // 优先尝试多选框
+                        if (clickCheckboxOption(opt, key)) {
+                            logSelection('选择选项', key, '多选模式');
+                            return true;
+                        }
+                        
+                        // 多选框失败，尝试单选框
+                        if (clickRadioOption(opt, key)) {
+                            logSelection('选择选项', key, '单选模式');
+                            return true;
+                        }
+                    } else {
+                        // 优先尝试单选框
+                        if (clickRadioOption(opt, key)) {
+                            logSelection('选择选项', key, '单选模式');
+                            return true;
+                        }
+                        
+                        // 单选框失败，尝试多选框
+                        if (clickCheckboxOption(opt, key)) {
+                            logSelection('选择选项', key, '多选模式');
+                            return true;
+                        }
+                    }
+                } catch (e) {
+                    console.error('点击选项失败:', e);
+                }
+            }
+        }
+        
+        return false;
+    }
+
     // ========== 创建浮动按钮 ==========
     function createFloatingButton() {
         // 检查是否已存在浮动按钮
@@ -766,22 +867,13 @@
         }
         // 多选题处理
         else if (answerKey.length > 1 && isMultipleChoice) {
-            // 改进答案分割逻辑，正确处理分隔符
-            let keys = [];
-            // 尝试不同的分割方式
-            if (answerKey.includes('、') || answerKey.includes(',') || answerKey.includes('，')) {
-                // 如果包含分隔符，按分隔符分割
-                keys = answerKey.split(/[、,，]/).filter(k => k.trim());
-            } else {
-                // 如果没有分隔符，按字符分割
-                keys = answerKey.split('');
-            }
-            
+            // 使用公共函数分割答案
+            const keys = splitAnswerKey(answerKey);
             expectedSelections = keys.length;
             
             // 使用async/await处理多选题选项选择，确保每个选项都有足够时间被选中
             const processMultiChoiceOption = async (key) => {
-                const options = document.querySelectorAll('.an-item .option-answer');
+                const options = findOptions();
                 let found = false;
                 
                 for (const opt of options) {
@@ -790,11 +882,8 @@
                     if (text.startsWith(key)) {
                         found = true;
                         try {
-                            // 直接设置选中状态
-                            const input = opt.closest('.el-checkbox')?.querySelector('input[type="checkbox"]');
-                            if (input && !input.checked) {
-                                input.click();
-                                console.log(`✅ 已自动选择多选题选项: ${key}`);
+                            // 使用公共函数点击多选框
+                            if (clickCheckboxOption(opt, key)) {
                                 selectionResults.push({
                                     key: key,
                                     success: true,
@@ -804,7 +893,8 @@
                                 // 添加延迟，确保选项被正确选中
                                 await new Promise(resolve => setTimeout(resolve, 300));
                                 return true; // 选中成功
-                            } else if (input && input.checked) {
+                            } else {
+                                // 已经选中
                                 selectionResults.push({
                                     key: key,
                                     success: true,
@@ -850,91 +940,16 @@
         }
         // 单选题处理
         else {
-            // 改进答案分割逻辑，正确处理分隔符
-            let keys = [];
-            // 尝试不同的分割方式
-            if (answerKey.includes('、') || answerKey.includes(',') || answerKey.includes('，')) {
-                // 如果包含分隔符，按分隔符分割
-                keys = answerKey.split(/[、,，]/).filter(k => k.trim());
-            } else {
-                // 如果没有分隔符，按字符分割
-                keys = answerKey.split('');
-            }
-            
+            // 使用公共函数分割答案
+            const keys = splitAnswerKey(answerKey);
             expectedSelections = 1;
+            
+            // 尝试选择第一个匹配的选项
             for (const key of keys) {
-                // 优先尝试多选题选项（兼容题目类型错误的情况）
-                let options = document.querySelectorAll('.an-item .option-answer');
-                let found = false;
-
-                for (const opt of options) {
-                    const text = opt.textContent.trim();
-                    // 匹配选项开头（A. 选项内容 → 匹配 "A"）
-                    if (text.startsWith(key)) {
-                        found = true;
-                        try {
-                            // 先尝试多选题选项
-                            let input = opt.closest('.el-checkbox')?.querySelector('input[type="checkbox"]');
-                            if (input && !input.checked) {
-                                input.click();
-                                console.log(`✅ 已自动选择选项(多选模式): ${key}`);
-                                selectionResults.push({
-                                    key: key,
-                                    success: true,
-                                    description: '选项(多选模式)'
-                                });
-                                break;
-                            } else if (input && input.checked) {
-                                selectionResults.push({
-                                    key: key,
-                                    success: true,
-                                    description: '选项(多选模式,已选中)'
-                                });
-                                break;
-                            }
-
-                            // 再尝试单选题选项
-                            input = opt.closest('.el-radio')?.querySelector('input[type="radio"]');
-                            if (input && !input.checked) {
-                                input.click();
-                                console.log(`✅ 已自动选择选项(单选模式): ${key}`);
-                                selectionResults.push({
-                                    key: key,
-                                    success: true,
-                                    description: '选项(单选模式)'
-                                });
-                                break;
-                            } else if (input && input.checked) {
-                                selectionResults.push({
-                                    key: key,
-                                    success: true,
-                                    description: '选项(单选模式,已选中)'
-                                });
-                                break;
-                            }
-                        } catch (e) {
-                            console.error('点击选项失败:', e);
-                            selectionResults.push({
-                                key: key,
-                                success: false,
-                                description: '选项',
-                                error: e.message
-                            });
-                            break;
-                        }
-                    }
+                const result = selectOption(key, selectionResults, false);
+                if (result.success) {
+                    break; // 单选题只需要找到一个匹配的选项
                 }
-
-                if (!found) {
-                    selectionResults.push({
-                        key: key,
-                        success: false,
-                        description: '选项',
-                        error: '未找到匹配选项'
-                    });
-                }
-
-                if (found) break;
             }
             
             // 选项处理完成后，验证选项是否真正被勾选
@@ -1151,25 +1166,16 @@
 
     // ========== 检查选项是否真正被勾选 ==========
     function verifyOptionSelection(answerKey, isMultipleChoice) {
-        // 改进答案分割逻辑，正确处理分隔符
-        let keys = [];
-        // 尝试不同的分割方式
-        if (answerKey.includes('、') || answerKey.includes(',') || answerKey.includes('，')) {
-            // 如果包含分隔符，按分隔符分割
-            keys = answerKey.split(/[、,，]/).filter(k => k.trim());
-        } else {
-            // 如果没有分隔符，按字符分割
-            keys = answerKey.split('');
-        }
-        
+        // 使用公共函数分割答案
+        const keys = splitAnswerKey(answerKey);
         const notSelectedKeys = [];
         
         for (const key of keys) {
             let found = false;
             let isSelected = false;
             
-            // 查找匹配的选项
-            const options = document.querySelectorAll('.an-item .option-answer');
+            // 使用公共函数查找选项
+            const options = findOptions();
             for (const opt of options) {
                 const text = opt.textContent.trim();
                 if (text.startsWith(key)) {
@@ -1454,6 +1460,12 @@
                     opt.classList.remove('selected');
                 });
                 option.classList.add('selected');
+            });
+
+            // 为整个div容器添加点击事件
+            option.addEventListener('click', () => {
+                radio.checked = true;
+                radio.dispatchEvent(new Event('change'));
             });
 
             const label = document.createElement('label');
@@ -3679,90 +3691,43 @@
         }
         // 多选题处理
         else if (answerKey.length > 1 && isMultipleChoice) {
-            // 改进答案分割逻辑，正确处理分隔符
-            let keys = [];
-            // 尝试不同的分割方式
-            if (answerKey.includes('、') || answerKey.includes(',') || answerKey.includes('，')) {
-                // 如果包含分隔符，按分隔符分割
-                keys = answerKey.split(/[、,，]/).filter(k => k.trim());
-            } else {
-                // 如果没有分隔符，按字符分割
-                keys = answerKey.split('');
-            }
+            // 使用公共函数分割答案
+            const keys = splitAnswerKey(answerKey);
             
             for (const key of keys) {
-                const options = document.querySelectorAll('.an-item .option-answer');
+                // 使用公共函数查找选项
+                const options = findOptions();
                 for (const opt of options) {
                     const text = opt.textContent.trim();
                     // 匹配选项开头（A. 选项内容 → 匹配 "A"）
                     if (text.startsWith(key)) {
                         try {
-                            // 直接设置选中状态
-                            const input = opt.closest('.el-checkbox')?.querySelector('input[type="checkbox"]');
-                            if (input && !input.checked) {
-                                input.click();
-                                console.log(`✅ 已自动选择多选题选项: ${key}`);
-                                break; // 选中一个选项后跳出内层循环
-                            }
+                            // 使用公共函数点击选项
+                            const result = clickCheckboxOption(opt, key);
+                            if (result) break; // 选中一个选项后跳出内层循环
                         } catch (e) {
                             console.error('点击多选题选项失败:', e);
                         }
-                        }
                     }
                 }
-                
-                // 选项处理完成后，验证选项是否真正被勾选
-                setTimeout(() => {
-                    verifyOptionSelection(answerKey, false);
-                }, 500);
-            }
-        // 单选题处理
-        else {
-            // 改进答案分割逻辑，正确处理分隔符
-            let keys = [];
-            // 尝试不同的分割方式
-            if (answerKey.includes('、') || answerKey.includes(',') || answerKey.includes('，')) {
-                // 如果包含分隔符，按分隔符分割
-                keys = answerKey.split(/[、,，]/).filter(k => k.trim());
-            } else {
-                // 如果没有分隔符，按字符分割
-                keys = answerKey.split('');
             }
             
+            // 选项处理完成后，验证选项是否真正被勾选
+            setTimeout(() => {
+                verifyOptionSelection(answerKey, false);
+            }, 500);
+        }
+        // 单选题处理
+        else {
+            // 使用公共函数分割答案
+            const keys = splitAnswerKey(answerKey);
+            
             for (const key of keys) {
-                // 优先尝试多选题选项（兼容题目类型错误的情况）
-                let options = document.querySelectorAll('.an-item .option-answer');
-                let found = false;
-
-                for (const opt of options) {
-                    const text = opt.textContent.trim();
-                    // 匹配选项开头（A. 选项内容 → 匹配 "A"）
-                    if (text.startsWith(key)) {
-                        try {
-                            // 先尝试多选题选项
-                            let input = opt.closest('.el-checkbox')?.querySelector('input[type="checkbox"]');
-                            if (input && !input.checked) {
-                                input.click();
-                                console.log(`✅ 已自动选择选项(多选模式): ${key}`);
-                                found = true;
-                                break;
-                            }
-
-                            // 再尝试单选题选项
-                            input = opt.closest('.el-radio')?.querySelector('input[type="radio"]');
-                            if (input && !input.checked) {
-                                input.click();
-                                console.log(`✅ 已自动选择选项(单选模式): ${key}`);
-                                found = true;
-                                break;
-                            }
-                        } catch (e) {
-                            console.error('点击选项失败:', e);
-                        }
-                    }
+                // 使用公共函数选择选项
+                const result = selectOption(key, [], false);
+                if (result.success) {
+                    break; // 单选题只需要找到一个匹配的选项
                 }
-
-                if (found) break;
             }
         }
 
@@ -4046,6 +4011,12 @@
                     opt.classList.remove('selected');
                 });
                 option.classList.add('selected');
+            });
+
+            // 为整个div容器添加点击事件
+            option.addEventListener('click', () => {
+                radio.checked = true;
+                radio.dispatchEvent(new Event('change'));
             });
 
             const label = document.createElement('label');
