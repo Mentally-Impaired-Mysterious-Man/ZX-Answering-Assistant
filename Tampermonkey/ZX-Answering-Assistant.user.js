@@ -54,8 +54,74 @@
     // 初始化时加载设置
     loadSpeedSettings();
 
+    // ========== 将题库转换为JSON格式 ==========
+    function convertKnowledgeBaseToJSON(kb) {
+        const questions = [];
+        
+        for (const [questionText, answer] of Object.entries(kb)) {
+            // 解析答案，支持多选和单选
+            const answerArray = answer.includes('、') || answer.includes(',') || answer.includes('，') 
+                ? answer.split(/[、,，]/).filter(a => a.trim())
+                : answer.split('');
+            
+            // 创建题目对象
+            const questionObj = {
+                id: questions.length + 1,
+                question: questionText,
+                answer: answerArray,
+                type: answerArray.length > 1 ? 'multiple' : 'single'
+            };
+            
+            questions.push(questionObj);
+        }
+        
+        return {
+            version: "1.0",
+            created: new Date().toISOString(),
+            count: questions.length,
+            questions: questions
+        };
+    }
+
+    // ========== 从JSON格式解析题库 ==========
+    function parseKnowledgeBaseFromJSON(jsonStr) {
+        try {
+            const data = JSON.parse(jsonStr);
+            
+            // 验证JSON格式
+            if (!data.questions || !Array.isArray(data.questions)) {
+                console.error('无效的题库JSON格式');
+                return {};
+            }
+            
+            const kb = {};
+            
+            // 将JSON格式转换为内部格式
+            data.questions.forEach(q => {
+                if (q.question && q.answer) {
+                    // 将答案数组转换为字符串
+                    const answerStr = Array.isArray(q.answer) ? q.answer.join('') : q.answer;
+                    kb[q.question] = answerStr;
+                }
+            });
+            
+            return kb;
+        } catch (e) {
+            console.error('解析题库JSON失败:', e);
+            return {};
+        }
+    }
+
     // ========== 精准解析题库（支持新旧格式，特别优化多选题）==========
     function parseRawText(raw) {
+        // 首先尝试解析JSON格式
+        if (raw.trim().startsWith('{') && raw.trim().endsWith('}')) {
+            const jsonKb = parseKnowledgeBaseFromJSON(raw);
+            if (Object.keys(jsonKb).length > 0) {
+                return jsonKb;
+            }
+        }
+        
         const lines = raw.split('\n').map(l => l.trim()).filter(l => l);
         const kb = {};
         let currentQuestion = '';
@@ -656,7 +722,11 @@
             const raw = panel.querySelector('#kb-input').value;
             if (!raw.trim()) return;
             KNOWLEDGE_BASE = parseRawText(raw);
-            GM_setValue('knowledge_base_raw', raw);
+            
+            // 保存为JSON格式
+            const jsonKnowledgeBase = convertKnowledgeBaseToJSON(KNOWLEDGE_BASE);
+            GM_setValue('knowledge_base_raw', jsonKnowledgeBase);
+            
             renderFullList();
         };
 
@@ -781,7 +851,10 @@
             // 写入到kb-input和knowledge_base_raw
             const kbInput = panel.querySelector('#kb-input');
             kbInput.value = formattedQuestions;
-            GM_setValue('knowledge_base_raw', formattedQuestions);
+            
+            // 保存为JSON格式
+            const jsonKnowledgeBase = convertKnowledgeBaseToJSON(KNOWLEDGE_BASE);
+            GM_setValue('knowledge_base_raw', jsonKnowledgeBase);
 
             // 解析题库
             KNOWLEDGE_BASE = parseRawText(formattedQuestions);
@@ -801,8 +874,26 @@
         // 初始化加载
         const saved = GM_getValue('knowledge_base_raw', '');
         if (saved) {
-            panel.querySelector('#kb-input').value = saved;
-            KNOWLEDGE_BASE = parseRawText(saved);
+            // 检查是否为JSON格式
+            if (saved.trim().startsWith('{') && saved.trim().endsWith('}')) {
+                try {
+                    // 尝试解析JSON格式
+                    const jsonData = JSON.parse(saved);
+                    KNOWLEDGE_BASE = parseKnowledgeBaseFromJSON(saved);
+                    // 将解析后的题库格式化为文本显示在输入框
+                    const formattedQuestions = formatQuestionsToKnowledgeBase();
+                    panel.querySelector('#kb-input').value = formattedQuestions;
+                } catch (e) {
+                    console.error('解析JSON格式的题库失败:', e);
+                    // 如果解析失败，尝试按原格式解析
+                    panel.querySelector('#kb-input').value = saved;
+                    KNOWLEDGE_BASE = parseRawText(saved);
+                }
+            } else {
+                // 原格式处理
+                panel.querySelector('#kb-input').value = saved;
+                KNOWLEDGE_BASE = parseRawText(saved);
+            }
             renderFullList();
         }
 
@@ -3094,36 +3185,52 @@
 
     // 检查mammoth库是否已加载
     function checkMammothLibrary() {
-        if (typeof mammoth === 'undefined') {
+        return new Promise((resolve, reject) => {
+            // 如果库已经加载，直接返回成功
+            if (typeof mammoth !== 'undefined') {
+                resolve(true);
+                return;
+            }
+
             // 动态加载mammoth库
             const script = document.createElement('script');
             script.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
             script.onload = function() {
                 console.log('mammoth.js库加载成功');
+                resolve(true);
             };
             script.onerror = function() {
                 console.error('mammoth.js库加载失败，尝试备用CDN...');
                 // 尝试备用CDN
-                loadMammothFromBackup();
+                loadMammothFromBackup()
+                    .then(() => {
+                        console.log('mammoth.js库从备用CDN加载成功');
+                        resolve(true);
+                    })
+                    .catch(error => {
+                        console.error('所有CDN加载失败:', error);
+                        reject(new Error('无法加载mammoth.js库，请检查网络连接'));
+                    });
             };
             document.head.appendChild(script);
-
-            return false;
-        }
-        return true;
+        });
     }
 
     // 从备用CDN加载mammoth库
     function loadMammothFromBackup() {
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js';
-        script.onload = function() {
-            console.log('mammoth.js库从备用CDN加载成功');
-        };
-        script.onerror = function() {
-            console.error('所有CDN加载失败，请检查网络连接');
-        };
-        document.head.appendChild(script);
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js';
+            script.onload = function() {
+                console.log('mammoth.js库从备用CDN加载成功');
+                resolve(true);
+            };
+            script.onerror = function() {
+                console.error('备用CDN加载失败');
+                reject(new Error('所有CDN加载失败，请检查网络连接'));
+            };
+            document.head.appendChild(script);
+        });
     }
 
     // 显示Word文档提取对话框
@@ -3539,24 +3646,9 @@
             progressContainer.style.display = 'block';
 
             try {
-                // 检查mammoth库
-                if (!checkMammothLibrary()) {
-                    // 等待库加载
-                    await new Promise(resolve => {
-                        const checkInterval = setInterval(() => {
-                            if (typeof mammoth !== 'undefined') {
-                                clearInterval(checkInterval);
-                                resolve();
-                            }
-                        }, 100);
-
-                        // 设置超时
-                        setTimeout(() => {
-                            clearInterval(checkInterval);
-                            resolve();
-                        }, 5000);
-                    });
-                }
+                // 确保mammoth库已加载
+                await checkMammothLibrary();
+                console.log('mammoth库已加载完成，开始批量提取');
 
                 // 重置提取内容
                 window.wordExtractedContent = '';
@@ -3602,24 +3694,9 @@
             showWordStatus('正在提取内容，请稍候...', 'loading');
 
             try {
-                // 检查mammoth库
-                if (!checkMammothLibrary()) {
-                    // 等待库加载
-                    await new Promise(resolve => {
-                        const checkInterval = setInterval(() => {
-                            if (typeof mammoth !== 'undefined') {
-                                clearInterval(checkInterval);
-                                resolve();
-                            }
-                        }, 100);
-
-                        // 设置超时
-                        setTimeout(() => {
-                            clearInterval(checkInterval);
-                            resolve();
-                        }, 5000);
-                    });
-                }
+                // 确保mammoth库已加载
+                await checkMammothLibrary();
+                console.log('mammoth库已加载完成，开始提取');
 
                 // 提取内容
                 const content = await extractWordContent(window.currentWordFile);
@@ -3668,13 +3745,15 @@
                 const event = new Event('input', { bubbles: true });
                 kbInput.dispatchEvent(event);
 
-                // 保存到localStorage
-                GM_setValue('knowledge_base_raw', kbInput.value);
-
                 // 更新题库计数
                 const raw = kbInput.value;
                 if (raw.trim()) {
                     KNOWLEDGE_BASE = parseRawText(raw);
+                    
+                    // 保存为JSON格式
+                    const jsonKnowledgeBase = convertKnowledgeBaseToJSON(KNOWLEDGE_BASE);
+                    GM_setValue('knowledge_base_raw', jsonKnowledgeBase);
+                    
                     renderFullList();
                 }
 
@@ -3876,6 +3955,15 @@
         // 批量提取Word文件
         async function batchExtractWordFiles() {
             let questionNumber = 1; // 全局题目编号
+            
+            // 确保mammoth库已加载
+            try {
+                await checkMammothLibrary();
+                console.log('mammoth库已加载完成，开始批量提取');
+            } catch (error) {
+                console.error('mammoth库加载失败:', error);
+                throw new Error('mammoth库加载失败，请检查网络连接');
+            }
 
             for (let i = 0; i < window.wordFileList.length; i++) {
                 const file = window.wordFileList[i];
@@ -4954,7 +5042,11 @@
             const raw = panel.querySelector('#kb-input').value;
             if (!raw.trim()) return;
             KNOWLEDGE_BASE = parseRawText(raw);
-            GM_setValue('knowledge_base_raw', raw);
+            
+            // 保存为JSON格式
+            const jsonKnowledgeBase = convertKnowledgeBaseToJSON(KNOWLEDGE_BASE);
+            GM_setValue('knowledge_base_raw', jsonKnowledgeBase);
+            
             renderFullList();
         };
 
@@ -4978,8 +5070,26 @@
         // 初始化加载
         const saved = GM_getValue('knowledge_base_raw', '');
         if (saved) {
-            panel.querySelector('#kb-input').value = saved;
-            KNOWLEDGE_BASE = parseRawText(saved);
+            // 检查是否为JSON格式
+            if (saved.trim().startsWith('{') && saved.trim().endsWith('}')) {
+                try {
+                    // 尝试解析JSON格式
+                    const jsonData = JSON.parse(saved);
+                    KNOWLEDGE_BASE = parseKnowledgeBaseFromJSON(saved);
+                    // 将解析后的题库格式化为文本显示在输入框
+                    const formattedQuestions = formatQuestionsToKnowledgeBase();
+                    panel.querySelector('#kb-input').value = formattedQuestions;
+                } catch (e) {
+                    console.error('解析JSON格式的题库失败:', e);
+                    // 如果解析失败，尝试按原格式解析
+                    panel.querySelector('#kb-input').value = saved;
+                    KNOWLEDGE_BASE = parseRawText(saved);
+                }
+            } else {
+                // 原格式处理
+                panel.querySelector('#kb-input').value = saved;
+                KNOWLEDGE_BASE = parseRawText(saved);
+            }
             renderFullList();
         }
 
