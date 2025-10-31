@@ -56,6 +56,15 @@
 
     // ========== 精准解析题库（支持新旧格式，特别优化多选题）==========
     function parseRawText(raw) {
+        // 首先尝试解析JSON格式
+        const trimmedRaw = raw.trim();
+        if (trimmedRaw.startsWith('{') && trimmedRaw.endsWith('}')) {
+            const jsonKb = parseJSONFormat(trimmedRaw);
+            if (Object.keys(jsonKb).length > 0) {
+                return jsonKb;
+            }
+        }
+
         const lines = raw.split('\n').map(l => l.trim()).filter(l => l);
         const kb = {};
         let currentQuestion = '';
@@ -181,36 +190,156 @@
         return kb;
     }
 
+    // ========== 解析JSON格式题库 ==========
+    function parseJSONFormat(jsonText) {
+        try {
+            const data = JSON.parse(jsonText);
+            if (!data.questions || !Array.isArray(data.questions)) {
+                return {};
+            }
+
+            const kb = {};
+
+            data.questions.forEach(question => {
+                if (!question.title || !question.options) return;
+
+                let questionText = question.title.trim();
+                
+                // 添加选项内容到题干
+                if (question.options && Array.isArray(question.options)) {
+                    const optionsText = question.options.map(opt => opt.content || '').join(' ');
+                    questionText += ' ' + optionsText;
+                }
+
+                // 获取答案
+                let answer = '';
+                if (question.correctAnswers && Array.isArray(question.correctAnswers)) {
+                    answer = question.correctAnswers.join('');
+                }
+
+                // 添加到题库
+                if (answer) {
+                    kb[questionText] = answer;
+                }
+            });
+
+            return kb;
+        } catch (e) {
+            console.error('解析JSON格式题库失败:', e);
+            return {};
+        }
+    }
+
     // ========== 将提取的题目格式化为知识库格式 ==========
     function formatQuestionsToKnowledgeBase() {
-        if (storedQuestions.length === 0) {
-            return '';
+        // 直接返回JSON格式
+        return formatQuestionsToJSON();
+    }
+
+    // ========== 将文本格式题库转换为JSON格式 ==========
+    function convertTextToJSON(textContent) {
+        // 如果已经是JSON格式，直接返回
+        const trimmedText = textContent.trim();
+        if (trimmedText.startsWith('{') && trimmedText.endsWith('}')) {
+            try {
+                JSON.parse(trimmedText);
+                return trimmedText; // 已经是有效的JSON
+            } catch (e) {
+                // 不是有效的JSON，继续处理
+            }
         }
 
-        let formattedText = '';
+        // 尝试解析文本格式
+        const kb = parseRawText(textContent);
+        if (Object.keys(kb).length === 0) {
+            return JSON.stringify({ questions: [] }, null, 2);
+        }
+
+        // 将解析后的题库转换为JSON格式
+        const questions = [];
+        let index = 1;
+
+        for (const [questionText, answer] of Object.entries(kb)) {
+            // 尝试从题干中分离出选项
+            const options = [];
+            const optionRegex = /([A-D])\.\s+([^A-D]+)/g;
+            let match;
+            let cleanQuestion = questionText;
+            
+            // 提取选项
+            while ((match = optionRegex.exec(questionText)) !== null) {
+                const optionId = match[1];
+                const optionContent = match[2].trim();
+                options.push({
+                    id: optionId,
+                    content: optionContent,
+                    isCorrect: answer.includes(optionId)
+                });
+            }
+            
+            // 如果没有找到选项，创建默认选项
+            if (options.length === 0) {
+                // 假设答案是单个字符或多个字符
+                const answerChars = answer.split('');
+                answerChars.forEach(char => {
+                    if (/[A-D]/.test(char)) {
+                        options.push({
+                            id: char,
+                            content: `选项${char}`,
+                            isCorrect: true
+                        });
+                    }
+                });
+            }
+            
+            // 清理题干，移除选项部分
+            cleanQuestion = questionText.replace(/[A-D]\.\s+[^A-D]+/g, '').trim();
+            
+            // 添加到题目数组
+            questions.push({
+                id: index++,
+                title: cleanQuestion,
+                options: options,
+                correctAnswers: answer.split('')
+            });
+        }
+
+        return JSON.stringify({ questions }, null, 2);
+    }
+    function formatQuestionsToJSON() {
+        if (storedQuestions.length === 0) {
+            return JSON.stringify({ questions: [] }, null, 2);
+        }
+
+        const questions = [];
         const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
 
         storedQuestions.forEach((question, index) => {
             const options = answerCache.get(question.id) || [];
             if (options.length === 0) return; // 跳过没有答案的题目
 
-            // 添加题目编号和标题
-            formattedText += `---\n\n### ${index + 1}. ${question.title}\n`;
+            // 构建选项对象
+            const optionObjects = options.map((option, idx) => ({
+                id: letters[idx] || (idx + 1),
+                content: option.content,
+                isCorrect: option.isCorrect || false
+            }));
 
-            // 添加选项
-            options.forEach((option, idx) => {
-                formattedText += `${letters[idx] || (idx + 1)}. ${option.content}\n`;
+            // 获取正确答案
+            const correctAnswers = optionObjects
+                .filter(opt => opt.isCorrect)
+                .map(opt => opt.id);
+
+            // 添加到题目数组
+            questions.push({
+                id: index + 1,
+                title: question.title,
+                options: optionObjects,
+                correctAnswers: correctAnswers
             });
-
-            // 添加答案
-            const correctAnswers = options
-                .map((opt, idx) => opt.isCorrect ? (letters[idx] || (idx + 1)) : null)
-                .filter(ans => ans !== null);
-
-            formattedText += `\n**答案：** ${correctAnswers.join('、')}\n\n---`;
         });
 
-        return formattedText.trim();
+        return JSON.stringify({ questions }, null, 2);
     }
 
     // ========== 标准化题目（用于模糊匹配）==========
@@ -655,8 +784,16 @@
         panel.querySelector('#parse-btn').onclick = () => {
             const raw = panel.querySelector('#kb-input').value;
             if (!raw.trim()) return;
-            KNOWLEDGE_BASE = parseRawText(raw);
-            GM_setValue('knowledge_base_raw', raw);
+            
+            // 将文本转换为JSON格式
+            const jsonContent = convertTextToJSON(raw);
+            
+            // 更新输入框内容为JSON格式
+            panel.querySelector('#kb-input').value = jsonContent;
+            
+            // 解析JSON格式内容
+            KNOWLEDGE_BASE = parseRawText(jsonContent);
+            GM_setValue('knowledge_base_raw', jsonContent);
             renderFullList();
         };
 
@@ -3661,8 +3798,11 @@
             console.log('题库输入框:', kbInput);
 
             if (kbInput) {
-                // 清除原有内容，直接设置新内容
-                kbInput.value = content;
+                // 将文本转换为JSON格式
+                const jsonContent = convertTextToJSON(content);
+                
+                // 清除原有内容，设置JSON格式内容
+                kbInput.value = jsonContent;
 
                 // 触发input事件，确保内容被保存
                 const event = new Event('input', { bubbles: true });
@@ -3678,7 +3818,7 @@
                     renderFullList();
                 }
 
-                showWordStatus('内容已复制到题库输入框', 'success');
+                showWordStatus('内容已转换为JSON格式并复制到题库输入框', 'success');
 
                 // 关闭对话框
                 dialog.style.display = 'none';
@@ -4953,8 +5093,16 @@
         panel.querySelector('#parse-btn').onclick = () => {
             const raw = panel.querySelector('#kb-input').value;
             if (!raw.trim()) return;
-            KNOWLEDGE_BASE = parseRawText(raw);
-            GM_setValue('knowledge_base_raw', raw);
+            
+            // 将文本转换为JSON格式
+            const jsonContent = convertTextToJSON(raw);
+            
+            // 更新输入框内容为JSON格式
+            panel.querySelector('#kb-input').value = jsonContent;
+            
+            // 解析JSON格式内容
+            KNOWLEDGE_BASE = parseRawText(jsonContent);
+            GM_setValue('knowledge_base_raw', jsonContent);
             renderFullList();
         };
 
