@@ -1120,9 +1120,23 @@
 
             // 尝试选择第一个匹配的选项
             for (const key of keys) {
-                const result = selectOption(key, selectionResults, false);
-                if (result.success) {
+                const success = selectOption(key, false);
+                if (success) {
+                    // 选择成功，记录结果
+                    selectionResults.push({
+                        key: key,
+                        success: true,
+                        description: '单选题选项'
+                    });
                     break; // 单选题只需要找到一个匹配的选项
+                } else {
+                    // 选择失败，记录结果
+                    selectionResults.push({
+                        key: key,
+                        success: false,
+                        description: '单选题选项',
+                        error: '未找到匹配选项或点击失败'
+                    });
                 }
             }
 
@@ -1207,6 +1221,7 @@
     function startObserver() {
         if (observer) {
             observer.disconnect();
+            observer._connected = false;
         }
 
         isProcessing = false;
@@ -1299,12 +1314,14 @@
         });
 
         observer.observe(document.body, { childList: true, subtree: true });
+        observer._connected = true; // 标记观察器已连接
         console.log("已启动题目观察");
     }
 
     function pauseObserver() {
         if (observer) {
             observer.disconnect();
+            observer._connected = false;
         }
     }
 
@@ -1312,6 +1329,28 @@
         setTimeout(() => {
             startObserver();
         }, 800); // 适当增加恢复延迟，确保页面完全加载
+    }
+
+    // ========== 观察器健康检查 ==========
+    function startObserverHealthCheck() {
+        // 每30秒检查一次观察器状态
+        setInterval(() => {
+            // 检查观察器是否存在且已连接
+            if (!observer || !observer._connected) {
+                console.log("检测到观察器未正常运行，尝试重新启动...");
+                startObserver();
+            }
+            
+            // 检查是否有题目元素存在
+            const titleEl = document.querySelector('.question-title');
+            if (titleEl && titleEl.textContent.trim()) {
+                // 如果有题目但观察器未运行，重新启动
+                if (!observer || !observer._connected) {
+                    console.log("检测到页面有题目但观察器未运行，重新启动...");
+                    startObserver();
+                }
+            }
+        }, 30000); // 每30秒检查一次
     }
 
     // ========== 检查开始确认对话框 ==========
@@ -1329,12 +1368,26 @@
                     // 确保题目区域加载完成
                     setTimeout(() => {
                         startObserver();
+                        // 添加备用启动机制
+                        setTimeout(() => {
+                            if (!observer || !observer._connected) {
+                                console.log("观察器未正常启动，尝试重新启动...");
+                                startObserver();
+                            }
+                        }, 2000);
                     }, 1200); // 增加延迟，确保页面完全加载
                 });
             }
         } else {
             // 没有确认对话框，直接开始观察
             startObserver();
+            // 添加备用启动机制
+            setTimeout(() => {
+                if (!observer || !observer._connected) {
+                    console.log("观察器未正常启动，尝试重新启动...");
+                    startObserver();
+                }
+            }, 3000);
         }
     }
 
@@ -3164,6 +3217,9 @@
                     const observer = new MutationObserver(checkStartConfirmation);
                     observer.observe(startModal, { attributes: true });
                 }
+                
+                // 启动观察器健康检查
+                startObserverHealthCheck();
             }, 2000); // 增加初始延迟，确保页面完全加载
         } else {
             document.addEventListener('DOMContentLoaded', () => {
@@ -3176,6 +3232,9 @@
                         const observer = new MutationObserver(checkStartConfirmation);
                         observer.observe(startModal, { attributes: true });
                     }
+                    
+                    // 启动观察器健康检查
+                    startObserverHealthCheck();
                 }, 1500);
             });
         }
@@ -5248,9 +5307,10 @@
             const keys = splitAnswerKey(answerKey);
 
             for (const key of keys) {
-                // 使用公共函数选择选项
-                const result = selectOption(key, [], false);
-                if (result.success) {
+                // 使用公共函数选择选项，只传入两个参数
+                const success = selectOption(key, false);
+                if (success) {
+                    console.log(`✅ 已成功选择单选题答案: ${key}`);
                     break; // 单选题只需要找到一个匹配的选项
                 }
             }
@@ -7067,6 +7127,9 @@
                     const observer = new MutationObserver(checkStartConfirmation);
                     observer.observe(startModal, { attributes: true });
                 }
+                
+                // 启动观察器健康检查
+                startObserverHealthCheck();
             }, 2000); // 增加初始延迟，确保页面完全加载
         } else {
             document.addEventListener('DOMContentLoaded', () => {
@@ -7079,6 +7142,9 @@
                         const observer = new MutationObserver(checkStartConfirmation);
                         observer.observe(startModal, { attributes: true });
                     }
+                    
+                    // 启动观察器健康检查
+                    startObserverHealthCheck();
                 }, 1500);
             });
         }
