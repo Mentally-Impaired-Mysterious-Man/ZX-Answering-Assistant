@@ -724,7 +724,7 @@
             
             // 保存为JSON格式
             const jsonKnowledgeBase = convertKnowledgeBaseToJSON(KNOWLEDGE_BASE);
-            GM_setValue('knowledge_base_raw', jsonKnowledgeBase);
+            GM_setValue('knowledge_base_raw', JSON.stringify(jsonKnowledgeBase));
             
             renderFullList();
         };
@@ -853,7 +853,7 @@
             
             // 保存为JSON格式
             const jsonKnowledgeBase = convertKnowledgeBaseToJSON(KNOWLEDGE_BASE);
-            GM_setValue('knowledge_base_raw', jsonKnowledgeBase);
+            GM_setValue('knowledge_base_raw', JSON.stringify(jsonKnowledgeBase));
 
             // 解析题库
             KNOWLEDGE_BASE = parseRawText(formattedQuestions);
@@ -869,25 +869,32 @@
         // 初始化加载
         const saved = GM_getValue('knowledge_base_raw', '');
         if (saved) {
+            // 确保saved是字符串类型
+            let savedText = saved;
+            if (typeof saved !== 'string') {
+                // 如果是对象，转换为JSON字符串
+                savedText = JSON.stringify(saved);
+            }
+            
             // 检查是否为JSON格式
-            if (saved.trim().startsWith('{') && saved.trim().endsWith('}')) {
+            if (savedText.trim().startsWith('{') && savedText.trim().endsWith('}')) {
                 try {
                     // 尝试解析JSON格式
-                    const jsonData = JSON.parse(saved);
-                    KNOWLEDGE_BASE = parseKnowledgeBaseFromJSON(saved);
+                    const jsonData = JSON.parse(savedText);
+                    KNOWLEDGE_BASE = parseKnowledgeBaseFromJSON(savedText);
                     // 将解析后的题库格式化为文本显示在输入框
                     const formattedQuestions = formatQuestionsToKnowledgeBase();
                     panel.querySelector('#kb-input').value = formattedQuestions;
                 } catch (e) {
                     console.error('解析JSON格式的题库失败:', e);
                     // 如果解析失败，尝试按原格式解析
-                    panel.querySelector('#kb-input').value = saved;
-                    KNOWLEDGE_BASE = parseRawText(saved);
+                    panel.querySelector('#kb-input').value = savedText;
+                    KNOWLEDGE_BASE = parseRawText(savedText);
                 }
             } else {
                 // 原格式处理
-                panel.querySelector('#kb-input').value = saved;
-                KNOWLEDGE_BASE = parseRawText(saved);
+                panel.querySelector('#kb-input').value = savedText;
+                KNOWLEDGE_BASE = parseRawText(savedText);
             }
             renderFullList();
         }
@@ -3806,7 +3813,7 @@
                     
                     // 保存为JSON格式
                     const jsonKnowledgeBase = convertKnowledgeBaseToJSON(KNOWLEDGE_BASE);
-                    GM_setValue('knowledge_base_raw', jsonKnowledgeBase);
+                    GM_setValue('knowledge_base_raw', JSON.stringify(jsonKnowledgeBase));
                     
                     renderFullList();
                 }
@@ -5098,7 +5105,7 @@
             
             // 保存为JSON格式
             const jsonKnowledgeBase = convertKnowledgeBaseToJSON(KNOWLEDGE_BASE);
-            GM_setValue('knowledge_base_raw', jsonKnowledgeBase);
+            GM_setValue('knowledge_base_raw', JSON.stringify(jsonKnowledgeBase));
             
             renderFullList();
         };
@@ -5119,25 +5126,32 @@
         // 初始化加载
         const saved = GM_getValue('knowledge_base_raw', '');
         if (saved) {
+            // 确保saved是字符串类型
+            let savedText = saved;
+            if (typeof saved !== 'string') {
+                // 如果是对象，转换为JSON字符串
+                savedText = JSON.stringify(saved);
+            }
+            
             // 检查是否为JSON格式
-            if (saved.trim().startsWith('{') && saved.trim().endsWith('}')) {
+            if (savedText.trim().startsWith('{') && savedText.trim().endsWith('}')) {
                 try {
                     // 尝试解析JSON格式
-                    const jsonData = JSON.parse(saved);
-                    KNOWLEDGE_BASE = parseKnowledgeBaseFromJSON(saved);
+                    const jsonData = JSON.parse(savedText);
+                    KNOWLEDGE_BASE = parseKnowledgeBaseFromJSON(savedText);
                     // 将解析后的题库格式化为文本显示在输入框
                     const formattedQuestions = formatQuestionsToKnowledgeBase();
                     panel.querySelector('#kb-input').value = formattedQuestions;
                 } catch (e) {
                     console.error('解析JSON格式的题库失败:', e);
                     // 如果解析失败，尝试按原格式解析
-                    panel.querySelector('#kb-input').value = saved;
-                    KNOWLEDGE_BASE = parseRawText(saved);
+                    panel.querySelector('#kb-input').value = savedText;
+                    KNOWLEDGE_BASE = parseRawText(savedText);
                 }
             } else {
                 // 原格式处理
-                panel.querySelector('#kb-input').value = saved;
-                KNOWLEDGE_BASE = parseRawText(saved);
+                panel.querySelector('#kb-input').value = savedText;
+                KNOWLEDGE_BASE = parseRawText(savedText);
             }
             renderFullList();
         }
@@ -5313,6 +5327,7 @@
     function startObserver() {
         if (observer) {
             observer.disconnect();
+            observer._connected = false;
         }
 
         isProcessing = false;
@@ -5358,12 +5373,14 @@
         });
 
         observer.observe(document.body, { childList: true, subtree: true });
+        observer._connected = true; // 标记观察器已连接
         console.log("已启动题目观察");
     }
 
     function pauseObserver() {
         if (observer) {
             observer.disconnect();
+            observer._connected = false;
         }
     }
 
@@ -5388,12 +5405,26 @@
                     // 确保题目区域加载完成
                     setTimeout(() => {
                         startObserver();
+                        // 添加备用启动机制
+                        setTimeout(() => {
+                            if (!observer || !observer._connected) {
+                                console.log("观察器未正常启动，尝试重新启动...");
+                                startObserver();
+                            }
+                        }, 2000);
                     }, 1200); // 增加延迟，确保页面完全加载
                 });
             }
         } else {
             // 没有确认对话框，直接开始观察
             startObserver();
+            // 添加备用启动机制
+            setTimeout(() => {
+                if (!observer || !observer._connected) {
+                    console.log("观察器未正常启动，尝试重新启动...");
+                    startObserver();
+                }
+            }, 3000);
         }
     }
 
