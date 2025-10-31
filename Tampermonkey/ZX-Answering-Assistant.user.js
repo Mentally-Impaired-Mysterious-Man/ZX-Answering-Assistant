@@ -646,7 +646,6 @@
                         <button id="auto-browse-btn" style="width:100%; padding:8px; background:#409eff; color:white; border:none; border-radius:4px; margin-bottom:8px;">🤖 自动遍历答案</button>
                         <button id="show-questions-btn" style="width:100%; padding:8px; background:#4CAF50; color:white; border:none; border-radius:4px; margin-bottom:8px;">📋 显示题目列表</button>
                         <button id="apply-questions-btn" style="width:100%; padding:8px; background:#9C27B0; color:white; border:none; border-radius:4px; margin-bottom:8px;">📝 一键应用题目</button>
-                        <button id="speed-settings-btn" style="width:100%; padding:8px; background:#FFA726; color:white; border:none; border-radius:4px; margin-bottom:8px;">⚙️ 速度设置</button>
                     </div>
                     <div id="extraction-status" style="padding:8px; background:#f0f0f0; border-radius:4px; font-size:12px;">
                         等待开始提取题目...
@@ -865,10 +864,6 @@
             answerTab.click();
 
             showNotification(`已成功应用 ${total} 道题目到知识库`, 'success');
-        };
-
-        panel.querySelector('#speed-settings-btn').onclick = () => {
-            showSpeedSettingsDialog();
         };
 
         // 初始化加载
@@ -4987,7 +4982,6 @@
                         <div style="margin-bottom:10px;">
                             <button id="auto-browse-btn" style="width:100%; padding:8px; background:#409eff; color:white; border:none; border-radius:4px; margin-bottom:8px;">🤖 自动遍历答案</button>
                             <button id="show-questions-btn" style="width:100%; padding:8px; background:#4CAF50; color:white; border:none; border-radius:4px; margin-bottom:8px;">📋 显示题目列表</button>
-                            <button id="speed-settings-btn" style="width:100%; padding:8px; background:#FFA726; color:white; border:none; border-radius:4px; margin-bottom:8px;">⚙️ 速度设置</button>
                         </div>
                         <div id="extraction-status" style="padding:8px; background:#f0f0f0; border-radius:4px; font-size:12px;">
                             等待开始提取题目...
@@ -5120,10 +5114,6 @@
             } else {
                 alert('请先触发题目加载');
             }
-        };
-
-        panel.querySelector('#speed-settings-btn').onclick = () => {
-            showSpeedSettingsDialog();
         };
 
         // 初始化加载
