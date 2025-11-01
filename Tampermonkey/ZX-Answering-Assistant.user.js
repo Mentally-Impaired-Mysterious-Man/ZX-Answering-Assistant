@@ -3013,6 +3013,18 @@
         const originalFetch = window.fetch;
         window.fetch = async (...args) => {
             try {
+                // 检查是否是需要过滤的关键API
+                const url = args[0];
+                if (typeof url === 'string') {
+                    // 过滤掉关键API，不进行拦截处理
+                    if (url.includes('beginevaluate') || 
+                        url.includes('studentevaluate') ||
+                        url.includes('evaluation/api/studentevaluate')) {
+                        // 直接调用原始fetch，不进行任何处理
+                        return originalFetch.apply(this, args);
+                    }
+                }
+
                 const response = await originalFetch.apply(this, args);
 
                 // 检查响应状态
@@ -3060,6 +3072,16 @@
         XMLHttpRequest.prototype.send = function (...args) {
             this.addEventListener('load', () => {
                 try {
+                    // 检查是否是需要过滤的关键API
+                    if (this._url && (
+                        this._url.includes('beginevaluate') || 
+                        this._url.includes('studentevaluate') ||
+                        this._url.includes('evaluation/api/studentevaluate')
+                    )) {
+                        // 对于关键API，不进行任何处理，直接返回
+                        return;
+                    }
+
                     // 检查响应状态
                     if (this.readyState === 4) {
                         if (this.status === 404) {
@@ -6932,6 +6954,18 @@
         const originalFetch = window.fetch;
         window.fetch = async (...args) => {
             try {
+                // 检查是否是需要过滤的关键API
+                const url = args[0];
+                if (typeof url === 'string') {
+                    // 过滤掉关键API，不进行拦截处理
+                    if (url.includes('beginevaluate') || 
+                        url.includes('studentevaluate') ||
+                        url.includes('evaluation/api/studentevaluate')) {
+                        // 直接调用原始fetch，不进行任何处理
+                        return originalFetch.apply(this, args);
+                    }
+                }
+
                 const response = await originalFetch.apply(this, args);
 
                 // 检查响应状态，特别是404错误
@@ -6983,6 +7017,16 @@
         XMLHttpRequest.prototype.send = function (...args) {
             this.addEventListener('load', () => {
                 try {
+                    // 检查是否是需要过滤的关键API
+                    if (this._url && (
+                        this._url.includes('beginevaluate') || 
+                        this._url.includes('studentevaluate') ||
+                        this._url.includes('evaluation/api/studentevaluate')
+                    )) {
+                        // 对于关键API，不进行任何处理，直接返回
+                        return;
+                    }
+
                     // 检查响应状态
                     if (this.readyState === 4) {
                         if (this.status === 404) {
