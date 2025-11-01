@@ -636,10 +636,35 @@
                     <button id="upload-word-btn" style="width:100%; padding:8px; background:#FF9800; color:white; border:none; border-radius:4px; margin-bottom:8px; font-weight:500;">📄 上传Word文档</button>
                     <textarea id="kb-input" placeholder="粘贴题库文本（支持足下教育标准格式）" style="width:100%; height:100px; margin-bottom:8px; padding:6px; border:1px solid #ccc; border-radius:4px; font-family:monospace; font-size:13px;"></textarea>
                     <button id="parse-btn" style="width:100%; padding:6px; background:#409eff; color:white; border:none; border-radius:4px; margin-bottom:8px;">✅ 解析题库</button>
-                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                        <input type="checkbox" id="disable-confirmation" style="margin-right: 6px;">
-                        <label for="disable-confirmation" style="font-size: 13px; color: #333;">关闭题目确认</label>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 8px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef;">
+                        <span style="font-size: 13px; color: #495057; font-weight: 500;">关闭题目确认</span>
+                        <label class="toggle-switch" style="position: relative; display: inline-block; width: 48px; height: 24px; margin: 0; cursor: pointer;">
+                            <input type="checkbox" id="disable-confirmation" style="opacity: 0; width: 0; height: 0; position: absolute;">
+                            <span class="toggle-slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #4CAF50; transition: .4s; border-radius: 24px;"></span>
+                        </label>
                     </div>
+                    <style>
+                        .toggle-switch .toggle-slider:before {
+                            position: absolute !important;
+                            content: "" !important;
+                            height: 18px !important;
+                            width: 18px !important;
+                            left: 3px !important;
+                            bottom: 3px !important;
+                            background-color: white !important;
+                            transition: .4s !important;
+                            border-radius: 50% !important;
+                        }
+                        .toggle-switch input:checked + .toggle-slider {
+                            background-color: #FFC107 !important;
+                        }
+                        .toggle-switch input:focus + .toggle-slider {
+                            box-shadow: 0 0 1px #FFC107 !important;
+                        }
+                        .toggle-switch input:checked + .toggle-slider:before {
+                            transform: translateX(24px) !important;
+                        }
+                    </style>
                     <button id="manual-auto-select-btn" style="width:100%; padding:8px; background:#9C27B0; color:white; border:none; border-radius:4px; margin-bottom:8px; position:relative; overflow:hidden; transition:all 0.3s ease; box-shadow:0 2px 5px rgba(156,39,176,0.3);">🎯 手动触发自动选择</button>
                     <div id="kb-count" style="margin-bottom:6px; color:#666; font-size:12px;"></div>
                     <div id="kb-full-list" style="font-size:12px; max-height:200px; overflow:auto; border:1px solid #eee; padding:6px; border-radius:4px; background:#fafafa;"></div>
@@ -738,17 +763,18 @@
             showSpeedSettingsDialog();
         };
 
-        // 关闭题目确认复选框事件
+        // 题目确认开关事件
         const disableConfirmationCheckbox = panel.querySelector('#disable-confirmation');
         
         // 从localStorage加载设置
         const savedDisableConfirmation = localStorage.getItem('disableConfirmation') === 'true';
         disableConfirmationCheckbox.checked = savedDisableConfirmation;
         
-        // 监听复选框变化
+        // 监听开关变化
         disableConfirmationCheckbox.addEventListener('change', function() {
             localStorage.setItem('disableConfirmation', this.checked);
-            showNotification(this.checked ? '已关闭题目确认提示' : '已开启题目确认提示', 'info');
+            const statusMessage = this.checked ? '已关闭题目确认，将自动答题' : '已开启题目确认，答题前需要确认';
+            showNotification(statusMessage, this.checked ? 'info' : 'success');
         });
 
         // 手动触发自动选择按钮事件
@@ -5007,10 +5033,35 @@
                         <button id="upload-word-btn" style="width:100%; padding:8px; background:#FF9800; color:white; border:none; border-radius:4px; margin-bottom:8px; font-weight:500;">📄 上传Word文档</button>
                         <textarea id="kb-input" placeholder="粘贴题库文本（支持足下教育标准格式）" style="width:100%; height:100px; margin-bottom:8px; padding:6px; border:1px solid #ccc; border-radius:4px; font-family:monospace; font-size:13px;"></textarea>
                         <button id="parse-btn" style="width:100%; padding:6px; background:#409eff; color:white; border:none; border-radius:4px; margin-bottom:8px;">✅ 解析题库</button>
-                        <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                            <input type="checkbox" id="disable-confirmation" style="margin-right: 6px;">
-                            <label for="disable-confirmation" style="font-size: 13px; color: #333;">关闭题目确认</label>
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 8px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef;">
+                            <span style="font-size: 13px; color: #495057; font-weight: 500;">题目确认</span>
+                            <label class="toggle-switch" style="position: relative; display: inline-block; width: 48px; height: 24px; margin: 0; cursor: pointer;">
+                                <input type="checkbox" id="disable-confirmation" style="opacity: 0; width: 0; height: 0; position: absolute;">
+                                <span class="toggle-slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #4CAF50; transition: .4s; border-radius: 24px;"></span>
+                            </label>
                         </div>
+                        <style>
+                            .toggle-switch .toggle-slider:before {
+                                position: absolute !important;
+                                content: "" !important;
+                                height: 18px !important;
+                                width: 18px !important;
+                                left: 3px !important;
+                                bottom: 3px !important;
+                                background-color: white !important;
+                                transition: .4s !important;
+                                border-radius: 50% !important;
+                            }
+                            .toggle-switch input:checked + .toggle-slider {
+                                background-color: #FFC107 !important;
+                            }
+                            .toggle-switch input:focus + .toggle-slider {
+                                box-shadow: 0 0 1px #FFC107 !important;
+                            }
+                            .toggle-switch input:checked + .toggle-slider:before {
+                                transform: translateX(24px) !important;
+                            }
+                        </style>
                         <div id="kb-count" style="margin-bottom:6px; color:#666; font-size:12px;"></div>
                         <div id="kb-full-list" style="font-size:12px; max-height:200px; overflow:auto; border:1px solid #eee; padding:6px; border-radius:4px; background:#fafafa;"></div>
                     </div>
@@ -5140,17 +5191,18 @@
             renderFullList();
         };
 
-        // 关闭题目确认复选框事件
+        // 题目确认开关事件
         const disableConfirmationCheckbox = panel.querySelector('#disable-confirmation');
         
         // 从localStorage加载设置
         const savedDisableConfirmation = localStorage.getItem('disableConfirmation') === 'true';
         disableConfirmationCheckbox.checked = savedDisableConfirmation;
         
-        // 监听复选框变化
+        // 监听开关变化
         disableConfirmationCheckbox.addEventListener('change', function() {
             localStorage.setItem('disableConfirmation', this.checked);
-            showNotification(this.checked ? '已关闭题目确认提示' : '已开启题目确认提示', 'info');
+            const statusMessage = this.checked ? '已关闭题目确认，将自动答题' : '已开启题目确认，答题前需要确认';
+            showNotification(statusMessage, this.checked ? 'info' : 'success');
         });
 
         // 题目提取相关事件
