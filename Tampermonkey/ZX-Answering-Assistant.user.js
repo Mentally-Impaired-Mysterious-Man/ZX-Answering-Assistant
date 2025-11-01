@@ -636,6 +636,10 @@
                     <button id="upload-word-btn" style="width:100%; padding:8px; background:#FF9800; color:white; border:none; border-radius:4px; margin-bottom:8px; font-weight:500;">📄 上传Word文档</button>
                     <textarea id="kb-input" placeholder="粘贴题库文本（支持足下教育标准格式）" style="width:100%; height:100px; margin-bottom:8px; padding:6px; border:1px solid #ccc; border-radius:4px; font-family:monospace; font-size:13px;"></textarea>
                     <button id="parse-btn" style="width:100%; padding:6px; background:#409eff; color:white; border:none; border-radius:4px; margin-bottom:8px;">✅ 解析题库</button>
+                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                        <input type="checkbox" id="disable-confirmation" style="margin-right: 6px;">
+                        <label for="disable-confirmation" style="font-size: 13px; color: #333;">关闭题目确认</label>
+                    </div>
                     <button id="manual-auto-select-btn" style="width:100%; padding:8px; background:#9C27B0; color:white; border:none; border-radius:4px; margin-bottom:8px; position:relative; overflow:hidden; transition:all 0.3s ease; box-shadow:0 2px 5px rgba(156,39,176,0.3);">🎯 手动触发自动选择</button>
                     <div id="kb-count" style="margin-bottom:6px; color:#666; font-size:12px;"></div>
                     <div id="kb-full-list" style="font-size:12px; max-height:200px; overflow:auto; border:1px solid #eee; padding:6px; border-radius:4px; background:#fafafa;"></div>
@@ -733,6 +737,19 @@
         panel.querySelector('#auto-browse-btn').onclick = () => {
             showSpeedSettingsDialog();
         };
+
+        // 关闭题目确认复选框事件
+        const disableConfirmationCheckbox = panel.querySelector('#disable-confirmation');
+        
+        // 从localStorage加载设置
+        const savedDisableConfirmation = localStorage.getItem('disableConfirmation') === 'true';
+        disableConfirmationCheckbox.checked = savedDisableConfirmation;
+        
+        // 监听复选框变化
+        disableConfirmationCheckbox.addEventListener('change', function() {
+            localStorage.setItem('disableConfirmation', this.checked);
+            showNotification(this.checked ? '已关闭题目确认提示' : '已开启题目确认提示', 'info');
+        });
 
         // 手动触发自动选择按钮事件
         panel.querySelector('#manual-auto-select-btn').onclick = function(e) {
@@ -933,6 +950,15 @@
 
     // ========== 答题确认弹窗 ==========
     function showModal(question, matchedQ, answer) {
+        // 检查是否禁用确认提示
+        const disableConfirmation = localStorage.getItem('disableConfirmation') === 'true';
+        
+        if (disableConfirmation) {
+            // 如果禁用了确认提示，直接执行自动选择答案
+            autoSelectAnswer(answer);
+            return;
+        }
+
         const old = document.getElementById('auto-answer-modal');
         if (old) old.remove();
 
@@ -4981,6 +5007,10 @@
                         <button id="upload-word-btn" style="width:100%; padding:8px; background:#FF9800; color:white; border:none; border-radius:4px; margin-bottom:8px; font-weight:500;">📄 上传Word文档</button>
                         <textarea id="kb-input" placeholder="粘贴题库文本（支持足下教育标准格式）" style="width:100%; height:100px; margin-bottom:8px; padding:6px; border:1px solid #ccc; border-radius:4px; font-family:monospace; font-size:13px;"></textarea>
                         <button id="parse-btn" style="width:100%; padding:6px; background:#409eff; color:white; border:none; border-radius:4px; margin-bottom:8px;">✅ 解析题库</button>
+                        <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                            <input type="checkbox" id="disable-confirmation" style="margin-right: 6px;">
+                            <label for="disable-confirmation" style="font-size: 13px; color: #333;">关闭题目确认</label>
+                        </div>
                         <div id="kb-count" style="margin-bottom:6px; color:#666; font-size:12px;"></div>
                         <div id="kb-full-list" style="font-size:12px; max-height:200px; overflow:auto; border:1px solid #eee; padding:6px; border-radius:4px; background:#fafafa;"></div>
                     </div>
@@ -5110,6 +5140,19 @@
             renderFullList();
         };
 
+        // 关闭题目确认复选框事件
+        const disableConfirmationCheckbox = panel.querySelector('#disable-confirmation');
+        
+        // 从localStorage加载设置
+        const savedDisableConfirmation = localStorage.getItem('disableConfirmation') === 'true';
+        disableConfirmationCheckbox.checked = savedDisableConfirmation;
+        
+        // 监听复选框变化
+        disableConfirmationCheckbox.addEventListener('change', function() {
+            localStorage.setItem('disableConfirmation', this.checked);
+            showNotification(this.checked ? '已关闭题目确认提示' : '已开启题目确认提示', 'info');
+        });
+
         // 题目提取相关事件
         panel.querySelector('#auto-browse-btn').onclick = () => {
             showSpeedSettingsDialog();
@@ -5190,6 +5233,15 @@
 
     // ========== 答题确认弹窗 ==========
     function showModal(question, matchedQ, answer) {
+        // 检查是否禁用确认提示
+        const disableConfirmation = localStorage.getItem('disableConfirmation') === 'true';
+        
+        if (disableConfirmation) {
+            // 如果禁用了确认提示，直接执行自动选择答案
+            autoSelectAnswer(answer);
+            return;
+        }
+
         const old = document.getElementById('auto-answer-modal');
         if (old) old.remove();
 
