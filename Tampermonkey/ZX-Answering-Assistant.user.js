@@ -794,9 +794,37 @@
         // 监听开关变化
         autoAnswerCheckbox.addEventListener('change', function() {
             localStorage.setItem('autoAnswer', this.checked);
-            const statusMessage = this.checked ? '已开启自动作答功能' : '已关闭自动作答功能';
-            showNotification(statusMessage, this.checked ? 'success' : 'info');
+            
+            if (this.checked) {
+                // 启用自动作答时，强制启用关闭题目确认功能
+                disableConfirmationCheckbox.checked = true;
+                localStorage.setItem('disableConfirmation', 'true');
+                
+                // 禁用关闭题目确认选项的设置功能
+                disableConfirmationCheckbox.disabled = true;
+                disableConfirmationCheckbox.style.opacity = '0.5';
+                disableConfirmationCheckbox.style.cursor = 'not-allowed';
+                
+                showNotification('已开启自动作答功能，已自动启用关闭题目确认', 'success');
+            } else {
+                // 关闭自动作答时，恢复关闭题目确认选项的设置功能
+                disableConfirmationCheckbox.disabled = false;
+                disableConfirmationCheckbox.style.opacity = '1';
+                disableConfirmationCheckbox.style.cursor = 'pointer';
+                
+                showNotification('已关闭自动作答功能', 'info');
+            }
         });
+        
+        // 初始化时检查自动作答状态
+        if (autoAnswerCheckbox.checked) {
+            // 如果自动作答已启用，则应用相应设置
+            disableConfirmationCheckbox.checked = true;
+            localStorage.setItem('disableConfirmation', 'true');
+            disableConfirmationCheckbox.disabled = true;
+            disableConfirmationCheckbox.style.opacity = '0.5';
+            disableConfirmationCheckbox.style.cursor = 'not-allowed';
+        }
 
         // 手动触发自动选择按钮事件
         panel.querySelector('#manual-auto-select-btn').onclick = function(e) {
@@ -1177,13 +1205,23 @@
 
             // 顺序处理每个选项，确保前一个选项完全选中后再处理下一个
             (async () => {
-                for (const key of keys) {
+                for (let i = 0; i < keys.length; i++) {
+                    const key = keys[i];
                     await processMultiChoiceOption(key);
+                    
+                    // 如果是最后一个选项，增加额外延迟
+                    if (i === keys.length - 1) {
+                        console.log('多选题最后一个选项选择完毕，额外等待1秒');
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
                 }
 
-                // 所有选项处理完成后，验证选项是否真正被勾选
+                // 所有选项处理完成后，只有在实际选择失败时才验证选项是否真正被勾选
                 setTimeout(() => {
-                    verifyOptionSelection(answerKey, true);
+                    const failedSelections = selectionResults.filter(r => !r.success);
+                    if (failedSelections.length > 0) {
+                        verifyOptionSelection(answerKey, true);
+                    }
                 }, 500);
             })();
         }
@@ -1215,9 +1253,12 @@
                 }
             }
 
-            // 选项处理完成后，验证选项是否真正被勾选
+            // 选项处理完成后，只有在实际选择失败时才验证选项是否真正被勾选
             setTimeout(() => {
-                verifyOptionSelection(answerKey, false);
+                const failedSelections = selectionResults.filter(r => !r.success);
+                if (failedSelections.length > 0) {
+                    verifyOptionSelection(answerKey, false);
+                }
             }, 500);
         }
 
@@ -1290,6 +1331,30 @@
                 }, 10000);
             }
         }, 500); // 延迟500ms检查，确保DOM更新完成
+        
+        // 如果启用了自动作答功能，在答案选择完成后自动点击下一题
+        const autoAnswerEnabled = localStorage.getItem('autoAnswer') === 'true';
+        if (autoAnswerEnabled) {
+            // 检测题目类型
+            const isMultipleChoice = document.querySelectorAll('.an-item .el-checkbox').length > 0;
+            
+            // 根据题目类型设置不同的延迟时间
+            const delayTime = isMultipleChoice ? 2000 : 1000; // 多选题延迟2秒，单选题延迟1秒
+            
+            // 延迟一段时间后再点击下一题，确保答案已完全选中
+            setTimeout(() => {
+                // 查找下一题按钮
+                const nextButton = document.querySelector('.question-action button.el-button--success');
+                if (nextButton && nextButton.textContent.includes('下一题')) {
+                    console.log('自动作答模式：自动点击下一题按钮');
+                    nextButton.click();
+                    showNotification('已自动选择答案并进入下一题', 'success', 2000);
+                } else {
+                    console.log('未找到下一题按钮，可能已是最后一题');
+                    showNotification('已自动选择答案，但未找到下一题按钮', 'warning', 3000);
+                }
+            }, delayTime); // 根据题目类型设置不同的延迟时间
+        }
     }
 
     // ========== 观察器控制 ==========
