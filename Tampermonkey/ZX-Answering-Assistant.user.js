@@ -643,6 +643,13 @@
                             <span class="toggle-slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #4CAF50; transition: .4s; border-radius: 24px;"></span>
                         </label>
                     </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 8px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef;">
+                        <span style="font-size: 13px; color: #495057; font-weight: 500;">自动作答</span>
+                        <label class="toggle-switch" style="position: relative; display: inline-block; width: 48px; height: 24px; margin: 0; cursor: pointer;">
+                            <input type="checkbox" id="auto-answer" style="opacity: 0; width: 0; height: 0; position: absolute;">
+                            <span class="toggle-slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #4CAF50; transition: .4s; border-radius: 24px;"></span>
+                        </label>
+                    </div>
                     <style>
                         .toggle-switch .toggle-slider:before {
                             position: absolute !important;
@@ -775,6 +782,20 @@
             localStorage.setItem('disableConfirmation', this.checked);
             const statusMessage = this.checked ? '已关闭题目确认，将自动答题' : '已开启题目确认，答题前需要确认';
             showNotification(statusMessage, this.checked ? 'info' : 'success');
+        });
+
+        // 自动作答开关事件
+        const autoAnswerCheckbox = panel.querySelector('#auto-answer');
+        
+        // 从localStorage加载设置
+        const savedAutoAnswer = localStorage.getItem('autoAnswer') === 'true';
+        autoAnswerCheckbox.checked = savedAutoAnswer;
+        
+        // 监听开关变化
+        autoAnswerCheckbox.addEventListener('change', function() {
+            localStorage.setItem('autoAnswer', this.checked);
+            const statusMessage = this.checked ? '已开启自动作答功能' : '已关闭自动作答功能';
+            showNotification(statusMessage, this.checked ? 'success' : 'info');
         });
 
         // 手动触发自动选择按钮事件
