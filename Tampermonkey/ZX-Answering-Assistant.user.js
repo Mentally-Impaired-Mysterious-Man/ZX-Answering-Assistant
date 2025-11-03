@@ -793,10 +793,14 @@
                         <textarea id="kb-input" placeholder="粘贴题库文本（支持足下教育标准格式）&#10;例如：&#10;1）这是一道题目&#10;A. 选项A&#10;B. 选项B&#10;答案：【A】" style="width:100%; height:100px; margin-bottom:0; padding:10px; border:1px solid #e0e0e0; border-radius:6px; font-family:monospace; font-size:13px; resize:vertical; transition:border-color 0.3s ease, box-shadow 0.3s ease;"></textarea>
                     </div>
                     
-                    <div style="margin-bottom: 12px;">
-                        <button id="parse-btn" style="width:100%; padding:10px; background:linear-gradient(135deg, #667eea, #764ba2); color:white; border:none; border-radius:6px; font-weight:500; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 2px 8px rgba(102,126,234,0.3); transition:all 0.3s ease;">
+                    <div style="margin-bottom: 12px; display: flex; gap: 8px;">
+                        <button id="parse-btn" style="flex: 1; padding:10px; background:linear-gradient(135deg, #667eea, #764ba2); color:white; border:none; border-radius:6px; font-weight:500; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 2px 8px rgba(102,126,234,0.3); transition:all 0.3s ease;">
                             <span style="font-size:16px;">✅</span>
                             <span>解析题库</span>
+                        </button>
+                        <button id="refresh-btn" style="flex: 0 0 80px; padding:10px; background:linear-gradient(135deg, #4CAF50, #388E3C); color:white; border:none; border-radius:6px; font-weight:500; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 2px 8px rgba(76,175,80,0.3); transition:all 0.3s ease;">
+                            <span style="font-size:16px;">🔄</span>
+                            <span>刷新</span>
                         </button>
                     </div>
                     
@@ -815,7 +819,7 @@
                         <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef;">
                             <span style="font-size: 13px; color: #495057; font-weight: 500; display: flex; align-items: center; gap: 6px;">
                                 <span style="font-size: 16px;">🤖</span>
-                                <span>自动作答</span>
+                                <span>自动作答（注意：有概率出错，慎用！）</span>
                             </span>
                             <label class="toggle-switch" style="position: relative; display: inline-block; width: 48px; height: 24px; margin: 0; cursor: pointer;">
                                 <input type="checkbox" id="auto-answer" style="opacity: 0; width: 0; height: 0; position: absolute;">
@@ -928,7 +932,7 @@
             }
             
             /* 按钮悬停效果 */
-            #upload-word-btn:hover, #parse-btn:hover, #manual-auto-select-btn:hover {
+            #upload-word-btn:hover, #parse-btn:hover, #manual-auto-select-btn:hover, #refresh-btn:hover {
                 transform: translateY(-2px);
                 box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             }
@@ -1048,6 +1052,55 @@
             GM_setValue('knowledge_base_raw', JSON.stringify(jsonKnowledgeBase));
 
             renderFullList();
+        };
+
+        // 刷新按钮事件处理
+        panel.querySelector('#refresh-btn').onclick = () => {
+            // 添加点击动画效果
+            const btn = panel.querySelector('#refresh-btn');
+            btn.style.transform = 'scale(0.95)';
+            btn.style.boxShadow = '0 1px 3px rgba(76,175,80,0.5)';
+            
+            setTimeout(() => {
+                btn.style.transform = 'scale(1)';
+                btn.style.boxShadow = '0 2px 8px rgba(76,175,80,0.3)';
+            }, 150);
+
+            // 从localStorage重新加载题库
+            const saved = GM_getValue('knowledge_base_raw', '');
+            if (saved) {
+                // 确保saved是字符串类型
+                let savedText = saved;
+                if (typeof saved !== 'string') {
+                    // 如果是对象，转换为JSON字符串
+                    savedText = JSON.stringify(saved);
+                }
+
+                // 检查是否为JSON格式
+                if (savedText.trim().startsWith('{') && savedText.trim().endsWith('}')) {
+                    try {
+                        // 尝试解析JSON格式
+                        const jsonData = JSON.parse(savedText);
+                        KNOWLEDGE_BASE = parseKnowledgeBaseFromJSON(savedText);
+                        // 将解析后的题库格式化为文本显示在输入框
+                        const formattedQuestions = formatQuestionsToKnowledgeBase();
+                        panel.querySelector('#kb-input').value = formattedQuestions;
+                    } catch (e) {
+                        console.error('解析JSON格式的题库失败:', e);
+                        // 如果解析失败，尝试按原格式解析
+                        panel.querySelector('#kb-input').value = savedText;
+                        KNOWLEDGE_BASE = parseRawText(savedText);
+                    }
+                } else {
+                    // 原格式处理
+                    panel.querySelector('#kb-input').value = savedText;
+                    KNOWLEDGE_BASE = parseRawText(savedText);
+                }
+                renderFullList();
+                showNotification('题库已刷新', 'success');
+            } else {
+                showNotification('没有找到保存的题库', 'warning');
+            }
         };
 
         // 题目提取相关事件
@@ -3902,7 +3955,20 @@
         // 检查是否已存在对话框
         let dialog = document.getElementById('word-extractor-dialog');
         if (dialog) {
-            dialog.style.display = 'block';
+            // 重新设置对话框位置，确保居中显示
+            dialog.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.5);
+                z-index: 2147483647;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            `;
+            dialog.style.display = 'flex';
             return;
         }
 
