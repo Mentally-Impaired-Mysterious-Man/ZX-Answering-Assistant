@@ -5665,7 +5665,10 @@
                             <div style="position:relative;">
                                 <textarea id="kb-input" placeholder="粘贴题库文本（支持足下教育标准格式）" style="width:100%; height:120px; margin-bottom:12px; padding:12px; border:1px solid #ddd; border-radius:8px; font-family:monospace; font-size:13px; resize:vertical; transition:border-color 0.3s; box-sizing:border-box;"></textarea>
                             </div>
-                            <button id="parse-btn" style="width:100%; padding:12px; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; border:none; border-radius:8px; margin-bottom:15px; font-weight:500; font-size:14px; box-shadow:0 4px 6px rgba(102, 126, 234, 0.2); transition:all 0.3s; cursor:pointer;">✅ 解析题库</button>
+                            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                                <button id="parse-btn" style="flex: 1; padding:12px; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; border:none; border-radius:8px; font-weight:500; font-size:14px; box-shadow:0 4px 6px rgba(102, 126, 234, 0.2); transition:all 0.3s; cursor:pointer;">✅ 解析题库</button>
+                                <button id="refresh-btn" style="flex: 0.3; padding:12px; background:linear-gradient(135deg, #28a745 0%, #20c997 100%); color:white; border:none; border-radius:8px; font-weight:500; font-size:14px; box-shadow:0 4px 6px rgba(40, 167, 69, 0.2); transition:all 0.3s; cursor:pointer;">🔄 刷新</button>
+                            </div>
                         </div>
                         <div style="margin-bottom:15px;">
                             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding: 12px; background: white; border-radius: 8px; border: 1px solid #e9ecef; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
@@ -5888,6 +5891,11 @@
                                     box-shadow: 0 6px 12px rgba(0,0,0,0.15);
                                 }
                                 
+                                /* 刷新按钮特殊悬停效果 */
+                                #refresh-btn:hover {
+                                    background: linear-gradient(135deg, #218838 0%, #1e7e34 100%);
+                                }
+                                
                                 /* 题库列表项悬停效果 */
                                 #kb-full-list > div:hover {
                                     background-color: #f0f8ff;
@@ -6070,6 +6078,39 @@
             GM_setValue('knowledge_base_raw', JSON.stringify(jsonKnowledgeBase));
 
             renderFullList();
+        };
+
+        // 刷新题库按钮事件
+        panel.querySelector('#refresh-btn').onclick = () => {
+            // 从GM存储中重新加载题库
+            const saved = GM_getValue('knowledge_base_raw', '');
+            if (saved) {
+                let savedText = saved;
+                if (typeof saved !== 'string') {
+                    savedText = JSON.stringify(saved);
+                }
+
+                // 检查是否为JSON格式
+                if (savedText.trim().startsWith('{') && savedText.trim().endsWith('}')) {
+                    try {
+                        const jsonData = JSON.parse(savedText);
+                        KNOWLEDGE_BASE = parseKnowledgeBaseFromJSON(savedText);
+                        const formattedQuestions = formatQuestionsToKnowledgeBase();
+                        panel.querySelector('#kb-input').value = formattedQuestions;
+                    } catch (e) {
+                        console.error('刷新题库时解析JSON失败:', e);
+                        panel.querySelector('#kb-input').value = savedText;
+                        KNOWLEDGE_BASE = parseRawText(savedText);
+                    }
+                } else {
+                    panel.querySelector('#kb-input').value = savedText;
+                    KNOWLEDGE_BASE = parseRawText(savedText);
+                }
+                renderFullList();
+                showNotification('题库已刷新，已同步其他标签页的更改', 'success');
+            } else {
+                showNotification('没有找到已保存的题库', 'warning');
+            }
         };
 
         // 题目确认开关事件
