@@ -5667,7 +5667,7 @@
                             </div>
                             <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                                 <button id="parse-btn" style="flex: 1; padding:12px; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; border:none; border-radius:8px; font-weight:500; font-size:14px; box-shadow:0 4px 6px rgba(102, 126, 234, 0.2); transition:all 0.3s; cursor:pointer;">✅ 解析题库</button>
-                                <button id="refresh-btn" style="flex: 0.3; padding:12px; background:linear-gradient(135deg, #28a745 0%, #20c997 100%); color:white; border:none; border-radius:8px; font-weight:500; font-size:14px; box-shadow:0 4px 6px rgba(40, 167, 69, 0.2); transition:all 0.3s; cursor:pointer;">🔄 刷新</button>
+                                <button id="refresh-btn" style="flex: 0 0 80px; padding:12px; background:linear-gradient(135deg, #28a745 0%, #20c997 100%); color:white; border:none; border-radius:8px; font-weight:500; font-size:14px; box-shadow:0 4px 6px rgba(40, 167, 69, 0.2); transition:all 0.3s; cursor:pointer; min-width: 80px;">🔄 刷新</button>
                             </div>
                         </div>
                         <div style="margin-bottom:15px;">
