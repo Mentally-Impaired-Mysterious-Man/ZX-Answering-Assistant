@@ -57,13 +57,13 @@
     // ========== 将题库转换为JSON格式 ==========
     function convertKnowledgeBaseToJSON(kb) {
         const questions = [];
-        
+
         for (const [questionText, answer] of Object.entries(kb)) {
             // 解析答案，支持多选和单选
-            const answerArray = answer.includes('、') || answer.includes(',') || answer.includes('，') 
+            const answerArray = answer.includes('、') || answer.includes(',') || answer.includes('，')
                 ? answer.split(/[、,，]/).filter(a => a.trim())
                 : answer.split('');
-            
+
             // 创建题目对象
             const questionObj = {
                 id: questions.length + 1,
@@ -71,10 +71,10 @@
                 answer: answerArray,
                 type: answerArray.length > 1 ? 'multiple' : 'single'
             };
-            
+
             questions.push(questionObj);
         }
-        
+
         return {
             version: "1.0",
             created: new Date().toISOString(),
@@ -87,15 +87,15 @@
     function parseKnowledgeBaseFromJSON(jsonStr) {
         try {
             const data = JSON.parse(jsonStr);
-            
+
             // 验证JSON格式
             if (!data.questions || !Array.isArray(data.questions)) {
                 console.error('无效的题库JSON格式');
                 return {};
             }
-            
+
             const kb = {};
-            
+
             // 将JSON格式转换为内部格式
             data.questions.forEach(q => {
                 if (q.question && q.answer) {
@@ -104,7 +104,7 @@
                     kb[q.question] = answerStr;
                 }
             });
-            
+
             return kb;
         } catch (e) {
             console.error('解析题库JSON失败:', e);
@@ -121,7 +121,7 @@
                 return jsonKb;
             }
         }
-        
+
         const lines = raw.split('\n').map(l => l.trim()).filter(l => l);
         const kb = {};
         let currentQuestion = '';
@@ -576,21 +576,166 @@
         const countEl = panel.querySelector('#kb-count');
         const listEl = panel.querySelector('#kb-full-list');
         const count = Object.keys(KNOWLEDGE_BASE).length;
-        countEl.textContent = `✅ 成功解析 ${count} 道题`;
+        
+        // 更新计数显示，添加动画效果
+        countEl.innerHTML = `<span style="display: inline-flex; align-items: center; gap: 6px;">
+            <span style="width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: inline-block;"></span>
+            <span>题库已加载 ${count} 道题目</span>
+        </span>`;
 
         if (count === 0) {
-            listEl.innerHTML = '<i style="color:#999;">未识别到有效题目，请检查格式</i>';
+            listEl.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; color: #999; text-align: center;">
+                    <div style="font-size: 32px; margin-bottom: 10px; opacity: 0.6;">📚</div>
+                    <div style="font-size: 14px;">未识别到有效题目</div>
+                    <div style="font-size: 12px; margin-top: 5px;">请检查题库格式或重新上传</div>
+                </div>
+            `;
             return;
         }
 
-        let html = '<ul style="padding-left:16px; margin:0; font-size:12px; line-height:1.6;">';
+        // 创建分类题目列表
+        let html = '<div style="padding: 4px;">';
+        
+        // 按题型分类
+        const singleChoice = [];
+        const multipleChoice = [];
+        const judgment = [];
+        
         Object.entries(KNOWLEDGE_BASE).forEach(([q, a]) => {
-            // 保留代码块显示
-            const displayQ = q.replace(/`/g, '<code>').replace(/`/g, '</code>');
-            html += `<li><strong style="color:#409eff;">${a}</strong> ${displayQ}</li>`;
+            if (a.includes('√') || a.includes('×')) {
+                judgment.push([q, a]);
+            } else if (a.length > 1) {
+                multipleChoice.push([q, a]);
+            } else {
+                singleChoice.push([q, a]);
+            }
         });
-        html += '</ul>';
+        
+        // 渲染单选题
+        if (singleChoice.length > 0) {
+            html += `
+                <div style="margin-bottom: 10px;">
+                    <div style="font-weight: bold; color: #409eff; margin-bottom: 5px; font-size: 13px; display: flex; align-items: center;">
+                        <span style="width: 8px; height: 8px; border-radius: 50%; background: #409eff; display: inline-block; margin-right: 5px;"></span>
+                        单选题 (${singleChoice.length})
+                    </div>
+                    <div style="background: #f8f9fa; border-radius: 4px; padding: 5px;">
+            `;
+            singleChoice.slice(0, 3).forEach(([q, a]) => {
+                const displayQ = q.length > 50 ? q.substring(0, 50) + '...' : q;
+                html += `
+                    <div style="margin-bottom: 4px; padding: 4px 6px; background: white; border-radius: 3px; font-size: 12px; display: flex; align-items: center;">
+                        <span style="background: #409eff; color: white; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; margin-right: 6px; flex-shrink: 0;">${a}</span>
+                        <span style="color: #333;">${displayQ}</span>
+                    </div>
+                `;
+            });
+            if (singleChoice.length > 3) {
+                html += `<div style="text-align: center; color: #999; font-size: 11px; padding: 3px;">... 还有 ${singleChoice.length - 3} 道题目</div>`;
+            }
+            html += `</div></div>`;
+        }
+        
+        // 渲染多选题
+        if (multipleChoice.length > 0) {
+            html += `
+                <div style="margin-bottom: 10px;">
+                    <div style="font-weight: bold; color: #9C27B0; margin-bottom: 5px; font-size: 13px; display: flex; align-items: center;">
+                        <span style="width: 8px; height: 8px; border-radius: 50%; background: #9C27B0; display: inline-block; margin-right: 5px;"></span>
+                        多选题 (${multipleChoice.length})
+                    </div>
+                    <div style="background: #f8f9fa; border-radius: 4px; padding: 5px;">
+            `;
+            multipleChoice.slice(0, 3).forEach(([q, a]) => {
+                const displayQ = q.length > 50 ? q.substring(0, 50) + '...' : q;
+                html += `
+                    <div style="margin-bottom: 4px; padding: 4px 6px; background: white; border-radius: 3px; font-size: 12px; display: flex; align-items: center;">
+                        <span style="background: #9C27B0; color: white; width: 18px; height: 18px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 10px; margin-right: 6px; flex-shrink: 0;">${a}</span>
+                        <span style="color: #333;">${displayQ}</span>
+                    </div>
+                `;
+            });
+            if (multipleChoice.length > 3) {
+                html += `<div style="text-align: center; color: #999; font-size: 11px; padding: 3px;">... 还有 ${multipleChoice.length - 3} 道题目</div>`;
+            }
+            html += `</div></div>`;
+        }
+        
+        // 渲染判断题
+        if (judgment.length > 0) {
+            html += `
+                <div style="margin-bottom: 10px;">
+                    <div style="font-weight: bold; color: #4CAF50; margin-bottom: 5px; font-size: 13px; display: flex; align-items: center;">
+                        <span style="width: 8px; height: 8px; border-radius: 50%; background: #4CAF50; display: inline-block; margin-right: 5px;"></span>
+                        判断题 (${judgment.length})
+                    </div>
+                    <div style="background: #f8f9fa; border-radius: 4px; padding: 5px;">
+            `;
+            judgment.slice(0, 3).forEach(([q, a]) => {
+                const displayQ = q.length > 50 ? q.substring(0, 50) + '...' : q;
+                html += `
+                    <div style="margin-bottom: 4px; padding: 4px 6px; background: white; border-radius: 3px; font-size: 12px; display: flex; align-items: center;">
+                        <span style="background: ${a.includes('√') ? '#4CAF50' : '#f44336'}; color: white; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; margin-right: 6px; flex-shrink: 0;">${a.includes('√') ? '✓' : '✗'}</span>
+                        <span style="color: #333;">${displayQ}</span>
+                    </div>
+                `;
+            });
+            if (judgment.length > 3) {
+                html += `<div style="text-align: center; color: #999; font-size: 11px; padding: 3px;">... 还有 ${judgment.length - 3} 道题目</div>`;
+            }
+            html += `</div></div>`;
+        }
+        
+        html += '</div>';
+        
+        // 添加展开/收起功能
+        html += `
+            <div style="text-align: center; margin-top: 5px;">
+                <button id="toggle-full-list" style="background: none; border: none; color: #667eea; font-size: 12px; cursor: pointer; padding: 2px 8px; border-radius: 3px;">
+                    展开全部题目 ▼
+                </button>
+            </div>
+        `;
+        
         listEl.innerHTML = html;
+        
+        // 添加展开/收起功能
+        const toggleBtn = document.getElementById('toggle-full-list');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => {
+                const listContainer = listEl.querySelector('div');
+                if (toggleBtn.textContent.includes('展开')) {
+                    // 展开全部
+                    let fullHtml = '<div style="padding: 4px;">';
+                    Object.entries(KNOWLEDGE_BASE).forEach(([q, a]) => {
+                        const displayQ = q.replace(/`/g, '<code>').replace(/`/g, '</code>');
+                        let answerColor = '#409eff';
+                        let answerDisplay = a;
+                        
+                        if (a.includes('√') || a.includes('×')) {
+                            answerColor = a.includes('√') ? '#4CAF50' : '#f44336';
+                            answerDisplay = a.includes('√') ? '✓' : '✗';
+                        } else if (a.length > 1) {
+                            answerColor = '#9C27B0';
+                        }
+                        
+                        fullHtml += `
+                            <div style="margin-bottom: 4px; padding: 4px 6px; background: white; border-radius: 3px; font-size: 12px; display: flex; align-items: center;">
+                                <span style="background: ${answerColor}; color: white; min-width: 18px; height: 18px; border-radius: ${a.length > 1 ? '3px' : '50%'}; display: flex; align-items: center; justify-content: center; font-size: 10px; margin-right: 6px; flex-shrink: 0; padding: 0 3px;">${answerDisplay}</span>
+                                <span style="color: #333;">${displayQ}</span>
+                            </div>
+                        `;
+                    });
+                    fullHtml += '</div>';
+                    listEl.querySelector('div').innerHTML = fullHtml;
+                    toggleBtn.textContent = '收起题目列表 ▲';
+                } else {
+                    // 收起，恢复分类显示
+                    renderFullList();
+                }
+            });
+        }
     }
 
     // ========== 创建统一的控制面板 ==========
@@ -633,64 +778,175 @@
             <div id="tab-content" style="padding:12px; overflow:auto; max-height:400px;">
                 <!-- 答题助手标签页内容 -->
                 <div id="answer-tab" class="tab-pane">
-                    <button id="upload-word-btn" style="width:100%; padding:8px; background:#FF9800; color:white; border:none; border-radius:4px; margin-bottom:8px; font-weight:500;">📄 上传Word文档</button>
-                    <textarea id="kb-input" placeholder="粘贴题库文本（支持足下教育标准格式）" style="width:100%; height:100px; margin-bottom:8px; padding:6px; border:1px solid #ccc; border-radius:4px; font-family:monospace; font-size:13px;"></textarea>
-                    <button id="parse-btn" style="width:100%; padding:6px; background:#409eff; color:white; border:none; border-radius:4px; margin-bottom:8px;">✅ 解析题库</button>
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 8px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef;">
-                        <span style="font-size: 13px; color: #495057; font-weight: 500;">关闭题目确认</span>
-                        <label class="toggle-switch" style="position: relative; display: inline-block; width: 48px; height: 24px; margin: 0; cursor: pointer;">
-                            <input type="checkbox" id="disable-confirmation" style="opacity: 0; width: 0; height: 0; position: absolute;">
-                            <span class="toggle-slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #4CAF50; transition: .4s; border-radius: 24px;"></span>
-                        </label>
+                    <div style="margin-bottom: 12px;">
+                        <button id="upload-word-btn" style="width:100%; padding:10px; background:linear-gradient(135deg, #FF9800, #F57C00); color:white; border:none; border-radius:6px; font-weight:500; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 2px 8px rgba(255,152,0,0.3); transition:all 0.3s ease;">
+                            <span style="font-size:16px;">📄</span>
+                            <span>上传Word文档</span>
+                        </button>
                     </div>
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 8px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef;">
-                        <span style="font-size: 13px; color: #495057; font-weight: 500;">自动作答</span>
-                        <label class="toggle-switch" style="position: relative; display: inline-block; width: 48px; height: 24px; margin: 0; cursor: pointer;">
-                            <input type="checkbox" id="auto-answer" style="opacity: 0; width: 0; height: 0; position: absolute;">
-                            <span class="toggle-slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #4CAF50; transition: .4s; border-radius: 24px;"></span>
-                        </label>
+                    
+                    <div style="margin-bottom: 12px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                            <label style="font-size: 13px; color: #495057; font-weight: 500;">题库文本</label>
+                            <button id="clear-text-btn" style="background: none; border: none; color: #6c757d; font-size: 12px; cursor: pointer; padding: 2px 6px; border-radius: 3px;">清空</button>
+                        </div>
+                        <textarea id="kb-input" placeholder="粘贴题库文本（支持足下教育标准格式）&#10;例如：&#10;1）这是一道题目&#10;A. 选项A&#10;B. 选项B&#10;答案：【A】" style="width:100%; height:100px; margin-bottom:0; padding:10px; border:1px solid #e0e0e0; border-radius:6px; font-family:monospace; font-size:13px; resize:vertical; transition:border-color 0.3s ease, box-shadow 0.3s ease;"></textarea>
                     </div>
-                    <style>
-                        .toggle-switch .toggle-slider:before {
-                            position: absolute !important;
-                            content: "" !important;
-                            height: 18px !important;
-                            width: 18px !important;
-                            left: 3px !important;
-                            bottom: 3px !important;
-                            background-color: white !important;
-                            transition: .4s !important;
-                            border-radius: 50% !important;
-                        }
-                        .toggle-switch input:checked + .toggle-slider {
-                            background-color: #FFC107 !important;
-                        }
-                        .toggle-switch input:focus + .toggle-slider {
-                            box-shadow: 0 0 1px #FFC107 !important;
-                        }
-                        .toggle-switch input:checked + .toggle-slider:before {
-                            transform: translateX(24px) !important;
-                        }
-                    </style>
-                    <button id="manual-auto-select-btn" style="width:100%; padding:8px; background:#9C27B0; color:white; border:none; border-radius:4px; margin-bottom:8px; position:relative; overflow:hidden; transition:all 0.3s ease; box-shadow:0 2px 5px rgba(156,39,176,0.3);">🎯 手动触发自动选择</button>
-                    <div id="kb-count" style="margin-bottom:6px; color:#666; font-size:12px;"></div>
-                    <div id="kb-full-list" style="font-size:12px; max-height:200px; overflow:auto; border:1px solid #eee; padding:6px; border-radius:4px; background:#fafafa;"></div>
+                    
+                    <div style="margin-bottom: 12px;">
+                        <button id="parse-btn" style="width:100%; padding:10px; background:linear-gradient(135deg, #667eea, #764ba2); color:white; border:none; border-radius:6px; font-weight:500; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 2px 8px rgba(102,126,234,0.3); transition:all 0.3s ease;">
+                            <span style="font-size:16px;">✅</span>
+                            <span>解析题库</span>
+                        </button>
+                    </div>
+                    
+                    <div style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef;">
+                            <span style="font-size: 13px; color: #495057; font-weight: 500; display: flex; align-items: center; gap: 6px;">
+                                <span style="font-size: 16px;">🔕</span>
+                                <span>关闭题目确认</span>
+                            </span>
+                            <label class="toggle-switch" style="position: relative; display: inline-block; width: 48px; height: 24px; margin: 0; cursor: pointer;">
+                                <input type="checkbox" id="disable-confirmation" style="opacity: 0; width: 0; height: 0; position: absolute;">
+                                <span class="toggle-slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px;"></span>
+                            </label>
+                        </div>
+                        
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef;">
+                            <span style="font-size: 13px; color: #495057; font-weight: 500; display: flex; align-items: center; gap: 6px;">
+                                <span style="font-size: 16px;">🤖</span>
+                                <span>自动作答</span>
+                            </span>
+                            <label class="toggle-switch" style="position: relative; display: inline-block; width: 48px; height: 24px; margin: 0; cursor: pointer;">
+                                <input type="checkbox" id="auto-answer" style="opacity: 0; width: 0; height: 0; position: absolute;">
+                                <span class="toggle-slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px;"></span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 12px;">
+                        <button id="manual-auto-select-btn" style="width:100%; padding:10px; background:linear-gradient(135deg, #9C27B0, #7B1FA2); color:white; border:none; border-radius:6px; font-weight:500; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 2px 8px rgba(156,39,176,0.3); transition:all 0.3s ease;">
+                            <span style="font-size:16px;">🎯</span>
+                            <span>手动触发自动选择</span>
+                        </button>
+                    </div>
+                    
+                    <div id="kb-count" style="margin-bottom:6px; color:#666; font-size:13px; font-weight:500;"></div>
+                    <div id="kb-full-list" style="font-size:12px; max-height:300px; overflow-y:auto; border:1px solid #e0e0e0; padding:6px; border-radius:6px; background:#fafafa;"></div>
                 </div>
                 <!-- 题目提取标签页内容 -->
                 <div id="extract-tab" class="tab-pane" style="display:none;">
-                    <div style="margin-bottom:10px;">
-                        <button id="auto-browse-btn" style="width:100%; padding:8px; background:#409eff; color:white; border:none; border-radius:4px; margin-bottom:8px;">🤖 自动遍历答案</button>
-                        <button id="show-questions-btn" style="width:100%; padding:8px; background:#4CAF50; color:white; border:none; border-radius:4px; margin-bottom:8px;">📋 显示题目列表</button>
-                        <button id="apply-questions-btn" style="width:100%; padding:8px; background:#9C27B0; color:white; border:none; border-radius:4px; margin-bottom:8px;">📝 一键应用题目</button>
+                    <div style="margin-bottom: 15px;">
+                        <div style="font-size: 14px; font-weight: 500; color: #333; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                            <span style="font-size: 16px;">🔍</span>
+                            <span>题目提取工具</span>
+                        </div>
+                        <div style="background: #f8f9fa; border-radius: 6px; padding: 10px; margin-bottom: 10px; border: 1px solid #e9ecef;">
+                            <div style="font-size: 12px; color: #6c757d; margin-bottom: 5px;">使用说明：</div>
+                            <ul style="margin: 0; padding-left: 15px; font-size: 12px; color: #6c757d;">
+                                <li>点击"自动遍历答案"自动浏览页面并提取题目</li>
+                                <li>点击"显示题目列表"查看已提取的题目</li>
+                                <li>点击"一键应用题目"将提取的题目添加到题库</li>
+                            </ul>
+                        </div>
                     </div>
-                    <div id="extraction-status" style="padding:8px; background:#f0f0f0; border-radius:4px; font-size:12px;">
-                        等待开始提取题目...
+                    
+                    <div style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px;">
+                        <button id="auto-browse-btn" style="width:100%; padding:12px; background:linear-gradient(135deg, #667eea, #764ba2); color:white; border:none; border-radius:6px; font-weight:500; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 2px 8px rgba(102,126,234,0.3); transition:all 0.3s ease;">
+                            <span style="font-size:16px;">🤖</span>
+                            <span>自动遍历答案</span>
+                        </button>
+                        
+                        <button id="show-questions-btn" style="width:100%; padding:12px; background:linear-gradient(135deg, #4CAF50, #388E3C); color:white; border:none; border-radius:6px; font-weight:500; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 2px 8px rgba(76,175,80,0.3); transition:all 0.3s ease;">
+                            <span style="font-size:16px;">📋</span>
+                            <span>显示题目列表</span>
+                        </button>
+                        
+                        <button id="apply-questions-btn" style="width:100%; padding:12px; background:linear-gradient(135deg, #9C27B0, #7B1FA2); color:white; border:none; border-radius:6px; font-weight:500; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 2px 8px rgba(156,39,176,0.3); transition:all 0.3s ease;">
+                            <span style="font-size:16px;">📝</span>
+                            <span>一键应用题目</span>
+                        </button>
+                    </div>
+                    
+                    <div id="extraction-status" style="padding:12px; background:#f8f9fa; border-radius:6px; font-size:13px; border:1px solid #e9ecef; min-height: 60px; display: flex; flex-direction: column;">
+                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 5px;">
+                            <span style="font-size: 16px;">📊</span>
+                            <span style="font-weight: 500;">提取状态</span>
+                        </div>
+                        <div id="status-content" style="color: #6c757d; font-size: 12px;">
+                            等待开始提取题目...
+                        </div>
+                        <div id="progress-bar-container" style="display: none; margin-top: 8px;">
+                            <div style="background: #e9ecef; height: 6px; border-radius: 3px; overflow: hidden;">
+                                <div id="progress-bar" style="height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); width: 0%; transition: width 0.3s ease; border-radius: 3px;"></div>
+                            </div>
+                            <div id="progress-text" style="font-size: 11px; color: #6c757d; margin-top: 3px; text-align: right;">0%</div>
+                        </div>
+                    </div>
+                    
+                    <div id="extracted-questions-container" style="margin-top: 15px; display: none;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                            <div style="font-size: 13px; font-weight: 500; color: #333; display: flex; align-items: center; gap: 6px;">
+                                <span style="font-size: 16px;">📚</span>
+                                <span>已提取题目</span>
+                            </div>
+                            <button id="clear-extracted-btn" style="background: none; border: none; color: #6c757d; font-size: 12px; cursor: pointer; padding: 2px 6px; border-radius: 3px;">清空</button>
+                        </div>
+                        <div id="extracted-questions-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 6px; background: #fafafa; padding: 8px;">
+                            <!-- 题目列表将在这里动态生成 -->
+                        </div>
                     </div>
                 </div>
             </div>
         `;
 
         document.body.appendChild(panel);
+
+        // 添加开关样式
+        const toggleStyle = document.createElement('style');
+        toggleStyle.textContent = `
+            .toggle-switch .toggle-slider:before {
+                position: absolute !important;
+                content: "" !important;
+                height: 18px !important;
+                width: 18px !important;
+                left: 3px !important;
+                bottom: 3px !important;
+                background-color: white !important;
+                transition: .4s !important;
+                border-radius: 50% !important;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
+            }
+            .toggle-switch input:checked + .toggle-slider {
+                background-color: #667eea !important;
+            }
+            .toggle-switch input:focus + .toggle-slider {
+                box-shadow: 0 0 1px #667eea !important;
+            }
+            .toggle-switch input:checked + .toggle-slider:before {
+                transform: translateX(24px) !important;
+            }
+            
+            /* 按钮悬停效果 */
+            #upload-word-btn:hover, #parse-btn:hover, #manual-auto-select-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            }
+            
+            /* 文本框聚焦效果 */
+            #kb-input:focus {
+                border-color: #667eea;
+                box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+                outline: none;
+            }
+            
+            /* 清空按钮效果 */
+            #clear-text-btn:hover {
+                color: #667eea;
+                background-color: rgba(102, 126, 234, 0.1);
+            }
+        `;
+        document.head.appendChild(toggleStyle);
 
         // 拖拽逻辑
         const header = panel.querySelector('#panel-header');
@@ -723,15 +979,32 @@
 
         // 标签页切换逻辑
         const tabButtons = panel.querySelectorAll('.tab-btn');
+        const indicator = panel.querySelector('#tab-indicator');
+        
+        // 初始化指示器位置
+        const activeBtn = panel.querySelector('.tab-btn.active');
+        if (activeBtn && indicator) {
+            const btnRect = activeBtn.getBoundingClientRect();
+            const parentRect = activeBtn.parentElement.getBoundingClientRect();
+            indicator.style.left = `${btnRect.left - parentRect.left}px`;
+            indicator.style.width = `${btnRect.width}px`;
+        }
+        
         tabButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 // 更新按钮样式
                 tabButtons.forEach(b => {
-                    b.style.background = '#e1e8ed';
-                    b.style.color = '#333';
+                    b.style.color = '#666';
                 });
-                btn.style.background = '#409eff';
-                btn.style.color = 'white';
+                btn.style.color = '#667eea';
+                
+                // 更新指示器位置
+                if (indicator) {
+                    const btnRect = btn.getBoundingClientRect();
+                    const parentRect = btn.parentElement.getBoundingClientRect();
+                    indicator.style.left = `${btnRect.left - parentRect.left}px`;
+                    indicator.style.width = `${btnRect.width}px`;
+                }
 
                 // 切换内容显示
                 const tabName = btn.getAttribute('data-tab');
@@ -752,33 +1025,64 @@
         panel.querySelector('#upload-word-btn').onclick = () => {
             showWordExtractorDialog();
         };
+        
+        panel.querySelector('#clear-text-btn').onclick = () => {
+            const textArea = panel.querySelector('#kb-input');
+            if (textArea) {
+                textArea.value = '';
+                // 添加清空动画效果
+                textArea.style.transform = 'scale(0.98)';
+                setTimeout(() => {
+                    textArea.style.transform = 'scale(1)';
+                }, 200);
+            }
+        };
 
         panel.querySelector('#parse-btn').onclick = () => {
             const raw = panel.querySelector('#kb-input').value;
             if (!raw.trim()) return;
             KNOWLEDGE_BASE = parseRawText(raw);
-            
+
             // 保存为JSON格式
             const jsonKnowledgeBase = convertKnowledgeBaseToJSON(KNOWLEDGE_BASE);
             GM_setValue('knowledge_base_raw', JSON.stringify(jsonKnowledgeBase));
-            
+
             renderFullList();
         };
 
         // 题目提取相关事件
-        panel.querySelector('#auto-browse-btn').onclick = () => {
-            showSpeedSettingsDialog();
+        panel.querySelector('#auto-browse-btn').onclick = function() {
+            const btn = this;
+            const originalText = btn.innerHTML;
+            
+            // 添加加载状态
+            btn.innerHTML = '<span class="loading-spinner"></span> 加载中...';
+            btn.disabled = true;
+            btn.style.opacity = '0.7';
+            btn.style.cursor = 'not-allowed';
+            
+            // 模拟加载效果
+            setTimeout(() => {
+                // 恢复按钮状态
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+                
+                // 显示速度设置对话框
+                showSpeedSettingsDialog();
+            }, 500);
         };
 
         // 题目确认开关事件
         const disableConfirmationCheckbox = panel.querySelector('#disable-confirmation');
-        
+
         // 从localStorage加载设置
         const savedDisableConfirmation = localStorage.getItem('disableConfirmation') === 'true';
         disableConfirmationCheckbox.checked = savedDisableConfirmation;
-        
+
         // 监听开关变化
-        disableConfirmationCheckbox.addEventListener('change', function() {
+        disableConfirmationCheckbox.addEventListener('change', function () {
             localStorage.setItem('disableConfirmation', this.checked);
             const statusMessage = this.checked ? '已关闭题目确认，将自动答题' : '已开启题目确认，答题前需要确认';
             showNotification(statusMessage, this.checked ? 'info' : 'success');
@@ -786,36 +1090,36 @@
 
         // 自动作答开关事件
         const autoAnswerCheckbox = panel.querySelector('#auto-answer');
-        
+
         // 从localStorage加载设置
         const savedAutoAnswer = localStorage.getItem('autoAnswer') === 'true';
         autoAnswerCheckbox.checked = savedAutoAnswer;
-        
+
         // 监听开关变化
-        autoAnswerCheckbox.addEventListener('change', function() {
+        autoAnswerCheckbox.addEventListener('change', function () {
             localStorage.setItem('autoAnswer', this.checked);
-            
+
             if (this.checked) {
                 // 启用自动作答时，强制启用关闭题目确认功能
                 disableConfirmationCheckbox.checked = true;
                 localStorage.setItem('disableConfirmation', 'true');
-                
+
                 // 禁用关闭题目确认选项的设置功能
                 disableConfirmationCheckbox.disabled = true;
                 disableConfirmationCheckbox.style.opacity = '0.5';
                 disableConfirmationCheckbox.style.cursor = 'not-allowed';
-                
+
                 showNotification('已开启自动作答功能，已自动启用关闭题目确认', 'success');
             } else {
                 // 关闭自动作答时，恢复关闭题目确认选项的设置功能
                 disableConfirmationCheckbox.disabled = false;
                 disableConfirmationCheckbox.style.opacity = '1';
                 disableConfirmationCheckbox.style.cursor = 'pointer';
-                
+
                 showNotification('已关闭自动作答功能', 'info');
             }
         });
-        
+
         // 初始化时检查自动作答状态
         if (autoAnswerCheckbox.checked) {
             // 如果自动作答已启用，则应用相应设置
@@ -827,7 +1131,7 @@
         }
 
         // 手动触发自动选择按钮事件
-        panel.querySelector('#manual-auto-select-btn').onclick = function(e) {
+        panel.querySelector('#manual-auto-select-btn').onclick = function (e) {
             // 添加波纹动画效果
             this.classList.add('ripple');
             setTimeout(() => {
@@ -906,12 +1210,30 @@
             }
         };
 
-        panel.querySelector('#show-questions-btn').onclick = () => {
-            if (storedQuestions.length > 0) {
-                createQuestionPanel();
-            } else {
-                alert('请先触发题目加载');
-            }
+        panel.querySelector('#show-questions-btn').onclick = function() {
+            const btn = this;
+            const originalText = btn.innerHTML;
+            
+            // 添加加载状态
+            btn.innerHTML = '<span class="loading-spinner"></span> 加载中...';
+            btn.disabled = true;
+            btn.style.opacity = '0.7';
+            btn.style.cursor = 'not-allowed';
+            
+            // 模拟加载效果
+            setTimeout(() => {
+                // 恢复按钮状态
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+                
+                if (storedQuestions.length > 0) {
+                    createQuestionPanel();
+                } else {
+                    showNotification('请先触发题目加载', 'warning');
+                }
+            }, 500);
         };
 
         panel.querySelector('#apply-questions-btn').onclick = () => {
@@ -942,7 +1264,7 @@
             // 写入到kb-input和knowledge_base_raw
             const kbInput = panel.querySelector('#kb-input');
             kbInput.value = formattedQuestions;
-            
+
             // 保存为JSON格式
             const jsonKnowledgeBase = convertKnowledgeBaseToJSON(KNOWLEDGE_BASE);
             GM_setValue('knowledge_base_raw', JSON.stringify(jsonKnowledgeBase));
@@ -967,7 +1289,7 @@
                 // 如果是对象，转换为JSON字符串
                 savedText = JSON.stringify(saved);
             }
-            
+
             // 检查是否为JSON格式
             if (savedText.trim().startsWith('{') && savedText.trim().endsWith('}')) {
                 try {
@@ -994,6 +1316,16 @@
         // 更新题目提取状态
         function updateExtractionStatus() {
             const statusEl = panel.querySelector('#extraction-status');
+            const progressBar = panel.querySelector('#extraction-progress');
+            const statusText = panel.querySelector('#extraction-status-text');
+            const extractedQuestionsContainer = panel.querySelector('#extracted-questions-container');
+            
+            // 检查必要的DOM元素是否存在
+            if (!progressBar || !statusText) {
+                console.warn('提取状态元素未找到，跳过更新');
+                return;
+            }
+            
             const validQuestionIds = new Set(storedQuestions.map(q => q.id));
             const filteredCache = Array.from(answerCache.entries()).filter(
                 ([qid]) => validQuestionIds.has(qid)
@@ -1004,19 +1336,91 @@
                 return count + (opts.length > 0 ? 1 : 0);
             }, 0);
 
+            // 更新进度条和状态文本
             if (total > 0) {
-                statusEl.innerHTML = `
-                    <div>已检测到 <strong>${total}</strong> 道题目</div>
-                    <div>已提取答案 <strong>${completed}/${total}</strong> 道</div>
-                    <div style="margin-top:8px;">
-                        <div style="background:#e0e0e0; height:8px; border-radius:4px; overflow:hidden;">
-                            <div style="background:#4CAF50; height:100%; width:${(completed / total) * 100}%; transition:width 0.3s;"></div>
+                const progressPercent = Math.round((completed / total) * 100);
+                progressBar.style.width = `${progressPercent}%`;
+                statusText.textContent = `已提取 ${completed}/${total} 道题目答案 (${progressPercent}%)`;
+                
+                // 更新已提取题目列表
+                if (extractedQuestionsContainer) {
+                    updateExtractedQuestionsList();
+                }
+            } else {
+                progressBar.style.width = '0%';
+                statusText.textContent = '等待开始提取题目...';
+                
+                // 清空已提取题目列表
+                if (extractedQuestionsContainer) {
+                    extractedQuestionsContainer.innerHTML = '<div class="empty-state">暂无已提取的题目</div>';
+                }
+            }
+        }
+        
+        // 更新已提取题目列表
+        function updateExtractedQuestionsList() {
+            const container = panel.querySelector('#extracted-questions-list');
+            if (!container) return;
+            
+            // 获取已提取答案的题目
+            const validQuestionIds = new Set(storedQuestions.map(q => q.id));
+            const filteredCache = Array.from(answerCache.entries()).filter(
+                ([qid, opts]) => validQuestionIds.has(qid) && opts.length > 0
+            );
+            
+            if (filteredCache.length === 0) {
+                container.innerHTML = '<div class="empty-state">暂无已提取的题目</div>';
+                return;
+            }
+            
+            // 生成题目列表HTML
+            let html = '';
+            filteredCache.forEach(([qid, opts], index) => {
+                const question = storedQuestions.find(q => q.id === qid);
+                if (!question) return;
+                
+                // 获取答案文本
+                const answerText = Array.isArray(opts) ? opts.join(', ') : opts;
+                
+                // 获取题目类型
+                let questionType = '未知';
+                let typeIcon = '📝';
+                if (question.options) {
+                    const optionCount = question.options.split('\n').length;
+                    if (optionCount > 2) {
+                        questionType = '多选题';
+                        typeIcon = '☑️';
+                    } else {
+                        questionType = '单选题';
+                        typeIcon = '⭕';
+                    }
+                } else if (question.answer === '√' || question.answer === '×') {
+                    questionType = '判断题';
+                    typeIcon = '✅';
+                }
+                
+                // 截取题目文本（前50个字符）
+                const shortQuestion = question.question.length > 50 
+                    ? question.question.substring(0, 50) + '...' 
+                    : question.question;
+                
+                html += `
+                    <div class="extracted-question-item" style="animation-delay: ${index * 0.1}s">
+                        <div class="question-header">
+                            <span class="question-type-icon">${typeIcon}</span>
+                            <span class="question-type">${questionType}</span>
+                            <span class="question-index">#${index + 1}</span>
+                        </div>
+                        <div class="question-text">${shortQuestion}</div>
+                        <div class="question-answer">
+                            <span class="answer-label">答案：</span>
+                            <span class="answer-value">${answerText}</span>
                         </div>
                     </div>
                 `;
-            } else {
-                statusEl.innerHTML = '等待开始提取题目...';
-            }
+            });
+            
+            container.innerHTML = html;
         }
 
         // 定期更新状态
@@ -1027,7 +1431,7 @@
     function showModal(question, matchedQ, answer) {
         // 检查是否禁用确认提示
         const disableConfirmation = localStorage.getItem('disableConfirmation') === 'true';
-        
+
         if (disableConfirmation) {
             // 如果禁用了确认提示，直接执行自动选择答案
             autoSelectAnswer(answer);
@@ -1074,9 +1478,43 @@
             resumeObserver();
         };
         modal.querySelector('#btn-confirm').onclick = () => {
-            modal.remove();
-            autoSelectAnswer(answer);
-            resumeObserver();
+            // 添加加载状态
+            const confirmBtn = modal.querySelector('#btn-confirm');
+            const originalText = confirmBtn.innerHTML;
+            confirmBtn.innerHTML = '<span class="loading-spinner"></span> 正在答题...';
+            confirmBtn.disabled = true;
+            confirmBtn.style.cursor = 'not-allowed';
+            confirmBtn.style.opacity = '0.7';
+            
+            // 添加加载动画样式
+            if (!document.getElementById('btn-loading-style')) {
+                const style = document.createElement('style');
+                style.id = 'btn-loading-style';
+                style.textContent = `
+                    .loading-spinner {
+                        display: inline-block;
+                        width: 16px;
+                        height: 16px;
+                        border: 2px solid rgba(255,255,255,0.3);
+                        border-radius: 50%;
+                        border-top-color: white;
+                        animation: spin 0.8s ease-in-out infinite;
+                        margin-right: 8px;
+                        vertical-align: middle;
+                    }
+                    @keyframes spin {
+                        to { transform: rotate(360deg); }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            // 延迟执行答题操作，以显示加载动画
+            setTimeout(() => {
+                modal.remove();
+                autoSelectAnswer(answer);
+                resumeObserver();
+            }, 500);
         };
     }
 
@@ -1208,7 +1646,7 @@
                 for (let i = 0; i < keys.length; i++) {
                     const key = keys[i];
                     await processMultiChoiceOption(key);
-                    
+
                     // 如果是最后一个选项，增加额外延迟
                     if (i === keys.length - 1) {
                         console.log('多选题最后一个选项选择完毕，额外等待1秒');
@@ -1319,7 +1757,7 @@
                 document.body.appendChild(answerHint);
 
                 // 点击提示框关闭
-                answerHint.addEventListener('click', function() {
+                answerHint.addEventListener('click', function () {
                     document.body.removeChild(answerHint);
                 });
 
@@ -1331,16 +1769,16 @@
                 }, 10000);
             }
         }, 500); // 延迟500ms检查，确保DOM更新完成
-        
+
         // 如果启用了自动作答功能，在答案选择完成后自动点击下一题
         const autoAnswerEnabled = localStorage.getItem('autoAnswer') === 'true';
         if (autoAnswerEnabled) {
             // 检测题目类型
             const isMultipleChoice = document.querySelectorAll('.an-item .el-checkbox').length > 0;
-            
+
             // 根据题目类型设置不同的延迟时间
             const delayTime = isMultipleChoice ? 2000 : 1000; // 多选题延迟2秒，单选题延迟1秒
-            
+
             // 延迟一段时间后再点击下一题，确保答案已完全选中
             setTimeout(() => {
                 // 查找下一题按钮
@@ -1480,7 +1918,7 @@
                 console.log("检测到观察器未正常运行，尝试重新启动...");
                 startObserver();
             }
-            
+
             // 检查是否有题目元素存在
             const titleEl = document.querySelector('.question-title');
             if (titleEl && titleEl.textContent.trim()) {
@@ -1620,7 +2058,7 @@
                 document.body.appendChild(answerHint);
 
                 // 点击提示框关闭
-                answerHint.addEventListener('click', function() {
+                answerHint.addEventListener('click', function () {
                     document.body.removeChild(answerHint);
                 });
 
@@ -2662,39 +3100,39 @@
             // 触发页面重新加载数据（通过重新触发当前路由或重新发送请求）
             setTimeout(() => {
                 // 重新触发fetch请求
-            if (currentClassID) {
-                const url = `/api/Knowledge/GetKnowQuestionEvaluation?classID=${currentClassID}`;
-                fetch(url)
-                    .then(response => {
-                        // 检查响应状态
-                        if (!response.ok) {
-                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                        }
+                if (currentClassID) {
+                    const url = `/api/Knowledge/GetKnowQuestionEvaluation?classID=${currentClassID}`;
+                    fetch(url)
+                        .then(response => {
+                            // 检查响应状态
+                            if (!response.ok) {
+                                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                            }
 
-                        // 检查响应内容类型
-                        const contentType = response.headers.get('content-type');
-                        if (!contentType || !contentType.includes('application/json')) {
-                            throw new Error('响应不是有效的JSON格式');
-                        }
+                            // 检查响应内容类型
+                            const contentType = response.headers.get('content-type');
+                            if (!contentType || !contentType.includes('application/json')) {
+                                throw new Error('响应不是有效的JSON格式');
+                            }
 
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log('重新获取数据成功:', data);
-                        // 数据会通过interceptFetch自动处理
-                    })
-                    .catch(error => {
-                        console.error('重新获取数据失败:', error);
-                        // 提供更友好的错误提示
-                        if (error.message.includes('404')) {
-                            showNotification('题目列表API不可用，可能是网站已更新', 'warning', 5000);
-                        } else if (error.message.includes('JSON')) {
-                            showNotification('服务器返回了非JSON格式的数据', 'error', 3000);
-                        } else {
-                            showNotification('获取数据失败，请稍后重试', 'error', 3000);
-                        }
-                    });
-            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log('重新获取数据成功:', data);
+                            // 数据会通过interceptFetch自动处理
+                        })
+                        .catch(error => {
+                            console.error('重新获取数据失败:', error);
+                            // 提供更友好的错误提示
+                            if (error.message.includes('404')) {
+                                showNotification('题目列表API不可用，可能是网站已更新', 'warning', 5000);
+                            } else if (error.message.includes('JSON')) {
+                                showNotification('服务器返回了非JSON格式的数据', 'error', 3000);
+                            } else {
+                                showNotification('获取数据失败，请稍后重试', 'error', 3000);
+                            }
+                        });
+                }
             }, 500);
         }
 
@@ -2786,6 +3224,11 @@
                 from { transform: translateY(0); opacity: 1; }
                 to { transform: translateY(-100%); opacity: 0; }
             }
+            @keyframes notificationPulse {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.02); }
+                100% { transform: scale(1); }
+            }
         `;
         document.head.appendChild(notificationStyle);
 
@@ -2804,7 +3247,7 @@
             z-index: 2147483647;
             font-size: 14px;
             font-weight: 600;
-            animation: zxSlideInRight 0.5s ease-out;
+            animation: zxSlideInRight 0.5s ease-out, notificationPulse 2s ease-in-out infinite;
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255,255,255,0.2);
             display: flex;
@@ -3103,7 +3546,7 @@
                 const url = args[0];
                 if (typeof url === 'string') {
                     // 过滤掉关键API，不进行拦截处理
-                    if (url.includes('beginevaluate') || 
+                    if (url.includes('beginevaluate') ||
                         url.includes('studentevaluate') ||
                         url.includes('evaluation/api/studentevaluate')) {
                         // 直接调用原始fetch，不进行任何处理
@@ -3160,7 +3603,7 @@
                 try {
                     // 检查是否是需要过滤的关键API
                     if (this._url && (
-                        this._url.includes('beginevaluate') || 
+                        this._url.includes('beginevaluate') ||
                         this._url.includes('studentevaluate') ||
                         this._url.includes('evaluation/api/studentevaluate')
                     )) {
@@ -3330,7 +3773,7 @@
             // 过滤掉一些常见的非关键错误
             if (event.reason && event.reason.message &&
                 (event.reason.message.includes('GetKnowQuestionEvaluation') ||
-                 event.reason.message.includes('Unexpected end of JSON input'))) {
+                    event.reason.message.includes('Unexpected end of JSON input'))) {
                 console.warn('捕获API相关Promise拒绝:', event.reason);
                 event.preventDefault(); // 阻止默认的控制台错误输出
                 return;
@@ -3379,7 +3822,7 @@
                     const observer = new MutationObserver(checkStartConfirmation);
                     observer.observe(startModal, { attributes: true });
                 }
-                
+
                 // 启动观察器健康检查
                 startObserverHealthCheck();
             }, 2000); // 增加初始延迟，确保页面完全加载
@@ -3394,7 +3837,7 @@
                         const observer = new MutationObserver(checkStartConfirmation);
                         observer.observe(startModal, { attributes: true });
                     }
-                    
+
                     // 启动观察器健康检查
                     startObserverHealthCheck();
                 }, 1500);
@@ -3416,11 +3859,11 @@
             // 动态加载mammoth库
             const script = document.createElement('script');
             script.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
-            script.onload = function() {
+            script.onload = function () {
                 console.log('mammoth.js库加载成功');
                 resolve(true);
             };
-            script.onerror = function() {
+            script.onerror = function () {
                 console.error('mammoth.js库加载失败，尝试备用CDN...');
                 // 尝试备用CDN
                 loadMammothFromBackup()
@@ -3442,11 +3885,11 @@
         return new Promise((resolve, reject) => {
             const script = document.createElement('script');
             script.src = 'https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js';
-            script.onload = function() {
+            script.onload = function () {
                 console.log('mammoth.js库从备用CDN加载成功');
                 resolve(true);
             };
-            script.onerror = function() {
+            script.onerror = function () {
                 console.error('备用CDN加载失败');
                 reject(new Error('所有CDN加载失败，请检查网络连接'));
             };
@@ -3524,7 +3967,7 @@
             cursor: pointer;
             color: #999;
         `;
-        closeButton.onclick = function() {
+        closeButton.onclick = function () {
             dialog.style.display = 'none';
         };
 
@@ -3543,13 +3986,13 @@
         `;
 
         // 添加拖拽悬停效果
-        uploadArea.addEventListener('dragover', function(e) {
+        uploadArea.addEventListener('dragover', function (e) {
             e.preventDefault();
             uploadArea.style.backgroundColor = '#e8f4fd';
             uploadArea.style.borderColor = '#2196F3';
         });
 
-        uploadArea.addEventListener('dragleave', function(e) {
+        uploadArea.addEventListener('dragleave', function (e) {
             e.preventDefault();
             uploadArea.style.backgroundColor = '#fafafa';
             uploadArea.style.borderColor = '#ccc';
@@ -3812,12 +4255,12 @@
         document.body.appendChild(dialog);
 
         // 点击上传区域触发文件选择
-        uploadArea.addEventListener('click', function() {
+        uploadArea.addEventListener('click', function () {
             fileInput.click();
         });
 
         // 处理拖拽上传
-        uploadArea.addEventListener('drop', function(e) {
+        uploadArea.addEventListener('drop', function (e) {
             e.preventDefault();
             uploadArea.style.backgroundColor = '#fafafa';
             uploadArea.style.borderColor = '#ccc';
@@ -3829,7 +4272,7 @@
         });
 
         // 处理文件选择
-        fileInput.addEventListener('change', function(e) {
+        fileInput.addEventListener('change', function (e) {
             if (e.target.files.length > 0) {
                 handleWordFiles(e.target.files);
                 // 确保文件列表容器和按钮组可见
@@ -3839,7 +4282,7 @@
         });
 
         // 清空列表按钮点击事件
-        clearListButton.addEventListener('click', function() {
+        clearListButton.addEventListener('click', function () {
             window.wordFileList = [];
             // 重置文件输入框的值，确保可以重新选择相同文件
             fileInput.value = '';
@@ -3856,7 +4299,7 @@
         });
 
         // 批量提取按钮点击事件
-        batchExtractButton.addEventListener('click', async function() {
+        batchExtractButton.addEventListener('click', async function () {
             if (window.wordFileList.length === 0) {
                 showWordStatus('请先添加文件', 'error');
                 return;
@@ -3904,7 +4347,7 @@
         });
 
         // 提取按钮点击事件
-        extractButton.addEventListener('click', async function() {
+        extractButton.addEventListener('click', async function () {
             if (!window.currentWordFile) {
                 showWordStatus('请先选择文件', 'error');
                 return;
@@ -3941,7 +4384,7 @@
         });
 
         // 复制到题库按钮点击事件
-        copyButton.addEventListener('click', function() {
+        copyButton.addEventListener('click', function () {
             // 使用批量提取的内容
             const content = window.wordExtractedContent || resultArea.textContent;
             console.log('复制的内容:', content);
@@ -3970,11 +4413,11 @@
                 const raw = kbInput.value;
                 if (raw.trim()) {
                     KNOWLEDGE_BASE = parseRawText(raw);
-                    
+
                     // 保存为JSON格式
                     const jsonKnowledgeBase = convertKnowledgeBaseToJSON(KNOWLEDGE_BASE);
                     GM_setValue('knowledge_base_raw', JSON.stringify(jsonKnowledgeBase));
-                    
+
                     renderFullList();
                 }
 
@@ -3988,7 +4431,7 @@
         });
 
         // 复制到粘贴板按钮点击事件
-        copyToClipboardButton.addEventListener('click', function() {
+        copyToClipboardButton.addEventListener('click', function () {
             // 使用批量提取的内容
             const content = window.wordExtractedContent || resultArea.textContent;
             console.log('复制到粘贴板的内容:', content);
@@ -4152,7 +4595,7 @@
                     justify-content: center;
                 `;
 
-                removeButton.addEventListener('click', function() {
+                removeButton.addEventListener('click', function () {
                     window.wordFileList.splice(index, 1);
                     updateWordFileListDisplay();
                     showWordStatus('文件已从列表中移除', 'info');
@@ -4176,7 +4619,7 @@
         // 批量提取Word文件
         async function batchExtractWordFiles() {
             let questionNumber = 1; // 全局题目编号
-            
+
             // 确保mammoth库已加载
             try {
                 await checkMammothLibrary();
@@ -4389,19 +4832,19 @@
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
 
-                reader.onload = function(e) {
+                reader.onload = function (e) {
                     const arrayBuffer = e.target.result;
 
                     try {
                         // 使用mammoth.js提取内容
-                        mammoth.extractRawText({arrayBuffer: arrayBuffer})
-                            .then(function(result) {
+                        mammoth.extractRawText({ arrayBuffer: arrayBuffer })
+                            .then(function (result) {
                                 const text = result.value; // 提取的纯文本
                                 // 格式化提取的内容
                                 const formattedContent = formatExtractedWordContent(text);
                                 resolve(formattedContent);
                             })
-                            .catch(function(error) {
+                            .catch(function (error) {
                                 console.error('提取失败:', error);
                                 reject(new Error('提取失败: ' + error.message));
                             });
@@ -4411,7 +4854,7 @@
                     }
                 };
 
-                reader.onerror = function() {
+                reader.onerror = function () {
                     reject(new Error('文件读取失败'));
                 };
 
@@ -4521,7 +4964,7 @@
             statusMessage.textContent = message;
 
             // 根据消息类型设置颜色和样式
-            switch(type) {
+            switch (type) {
                 case 'success':
                     statusMessage.style.color = '#4CAF50';
                     statusMessage.style.fontWeight = '600';
@@ -4817,7 +5260,7 @@
             justify-content: center;
             font-size: 28px;
             cursor: move;
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4), 0 0 0 0 rgba(102, 126, 234, 0.4);
             z-index: 2147483646;
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             border: 3px solid rgba(255, 255, 255, 0.2);
@@ -4828,6 +5271,7 @@
             font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", EmojiSymbols, sans-serif;
             transform-origin: center;
             will-change: transform, box-shadow;
+            user-select: none;
         `;
 
         // 添加动画样式和响应式设计
@@ -4842,9 +5286,9 @@
             }
 
             @keyframes pulse {
-                0% { box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4); }
+                0% { box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4), 0 0 0 0 rgba(102, 126, 234, 0.4); }
                 50% { box-shadow: 0 8px 35px rgba(102, 126, 234, 0.6), 0 0 20px rgba(102, 126, 234, 0.3); }
-                100% { box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4); }
+                100% { box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4), 0 0 0 0 rgba(102, 126, 234, 0.4); }
             }
 
             @keyframes bounce-in {
@@ -4852,6 +5296,11 @@
                 50% { transform: scale(1.05); }
                 70% { transform: scale(0.9); }
                 100% { transform: scale(1); opacity: 1; }
+            }
+
+            @keyframes ripple {
+                0% { transform: scale(0.8); opacity: 1; }
+                100% { transform: scale(2); opacity: 0; }
             }
 
             @media (max-width: 768px) {
@@ -4892,12 +5341,32 @@
             if (!isFloatingDragging) {
                 floatingBtn.style.transform = 'scale(1) rotate(0deg)';
                 floatingBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-                floatingBtn.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.4)';
+                floatingBtn.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.4), 0 0 0 0 rgba(102, 126, 234, 0.4)';
                 floatingBtn.style.animation = 'float 4s ease-in-out infinite, pulse 3s ease-in-out infinite';
                 floatingBtn.style.textAlign = 'center';
                 floatingBtn.style.lineHeight = '1';
             }
         });
+
+        // 创建涟漪效果函数
+        function createRipple(event) {
+            const ripple = document.createElement('span');
+            ripple.style.position = 'absolute';
+            ripple.style.borderRadius = '50%';
+            ripple.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
+            ripple.style.width = ripple.style.height = '40px';
+            ripple.style.top = '50%';
+            ripple.style.left = '50%';
+            ripple.style.transform = 'translate(-50%, -50%)';
+            ripple.style.animation = 'ripple 0.6s ease-out';
+            ripple.style.pointerEvents = 'none';
+            
+            floatingBtn.appendChild(ripple);
+            
+            setTimeout(() => {
+                ripple.remove();
+            }, 600);
+        }
 
         // 添加拖拽功能
         floatingBtn.addEventListener('mousedown', (e) => {
@@ -4942,7 +5411,8 @@
         });
 
         // 双击事件：显示控制面板
-        floatingBtn.addEventListener('dblclick', () => {
+        floatingBtn.addEventListener('dblclick', (e) => {
+            createRipple(e);
             const panel = document.getElementById('unified-control-panel');
             if (panel) {
                 panel.style.display = 'block';
@@ -4956,7 +5426,8 @@
 
         // 单击事件：显示控制面板（添加延迟以区分双击）
         let clickTimer = null;
-        floatingBtn.addEventListener('click', () => {
+        floatingBtn.addEventListener('click', (e) => {
+            createRipple(e);
             if (clickTimer) {
                 clearTimeout(clickTimer);
                 clickTimer = null;
@@ -5013,17 +5484,19 @@
             position: fixed;
             bottom: 20px;
             right: 20px;
-            width: 450px;
+            width: 480px;
             max-width: 90vw;
-            max-height: 80vh;
+            max-height: 85vh;
             background: white;
-            border: 1px solid #409eff;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15), 0 1px 8px rgba(0,0,0,0.1);
             z-index: 2147483647;
-            font-family: sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             overflow: hidden;
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
         `;
 
         // 添加响应式样式
@@ -5031,22 +5504,22 @@
         responsiveStyle.textContent = `
             @keyframes slideInUp {
                 from {
-                    transform: translateY(100%);
+                    transform: translateY(100%) scale(0.95);
                     opacity: 0;
                 }
                 to {
-                    transform: translateY(0);
+                    transform: translateY(0) scale(1);
                     opacity: 1;
                 }
             }
 
             @keyframes slideOutDown {
                 from {
-                    transform: translateY(0);
+                    transform: translateY(0) scale(1);
                     opacity: 1;
                 }
                 to {
-                    transform: translateY(100%);
+                    transform: translateY(100%) scale(0.95);
                     opacity: 0;
                 }
             }
@@ -5063,6 +5536,49 @@
                 100% { transform: scale(1); opacity: 1; }
             }
 
+            @keyframes tab-underline {
+                0% { width: 0; }
+                100% { width: 100%; }
+            }
+
+            /* 控制面板内容滚动条样式 */
+            #tab-content::-webkit-scrollbar {
+                width: 6px;
+            }
+            
+            #tab-content::-webkit-scrollbar-track {
+                background: #f1f1f1;
+                border-radius: 3px;
+            }
+            
+            #tab-content::-webkit-scrollbar-thumb {
+                background: #c1c1c1;
+                border-radius: 3px;
+            }
+            
+            #tab-content::-webkit-scrollbar-thumb:hover {
+                background: #a8a8a8;
+            }
+
+            /* 题库列表滚动条样式 */
+            #kb-full-list::-webkit-scrollbar {
+                width: 6px;
+            }
+            
+            #kb-full-list::-webkit-scrollbar-track {
+                background: #f1f1f1;
+                border-radius: 3px;
+            }
+            
+            #kb-full-list::-webkit-scrollbar-thumb {
+                background: #c1c1c1;
+                border-radius: 3px;
+            }
+            
+            #kb-full-list::-webkit-scrollbar-thumb:hover {
+                background: #a8a8a8;
+            }
+
             @media (max-width: 768px) {
                 #unified-control-panel {
                     width: 95vw !important;
@@ -5071,6 +5587,7 @@
                     left: 2.5vw !important;
                     bottom: 10px !important;
                     max-height: 85vh !important;
+                    border-radius: 8px !important;
                 }
 
                 #tab-content {
@@ -5079,7 +5596,7 @@
 
                 .tab-btn {
                     font-size: 14px !important;
-                    padding: 8px 4px !important;
+                    padding: 10px 4px !important;
                 }
             }
 
@@ -5091,31 +5608,32 @@
                     left: 1vw !important;
                     bottom: 5px !important;
                     max-height: 90vh !important;
+                    border-radius: 6px !important;
                 }
 
                 #panel-header {
-                    padding: 6px 10px !important;
-                    font-size: 14px !important;
+                    padding: 8px 12px !important;
+                    font-size: 16px !important;
                 }
 
                 #tab-content {
-                    padding: 8px !important;
+                    padding: 10px !important;
                     max-height: 70vh !important;
                 }
 
                 .tab-btn {
-                    font-size: 12px !important;
-                    padding: 6px 2px !important;
+                    font-size: 13px !important;
+                    padding: 8px 2px !important;
                 }
 
                 #kb-input {
                     height: 80px !important;
-                    font-size: 12px !important;
+                    font-size: 13px !important;
                 }
 
                 button {
-                    font-size: 12px !important;
-                    padding: 6px !important;
+                    font-size: 13px !important;
+                    padding: 8px !important;
                 }
             }
         `;
@@ -5123,64 +5641,319 @@
 
         // 创建标签页
         panel.innerHTML = `
-            <div id="panel-header" style="padding:8px 12px; background:#409eff; color:white; cursor:move; font-weight:bold; display:flex; justify-content:space-between; align-items:center;">
-                📚 答题与题目提取工具
-                <div>
-                    <span id="minimize-btn" style="cursor:pointer; font-size:18px; margin-right:8px;">−</span>
-                    <span id="close-btn" style="cursor:pointer; font-size:18px;">×</span>
+            <div id="panel-header" style="padding:12px 16px; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; cursor:move; font-weight:600; display:flex; justify-content:space-between; align-items:center; border-radius:12px 12px 0 0;">
+                <div style="display:flex; align-items:center;">
+                    <span style="font-size:18px; margin-right:8px;">📚</span>
+                    <span>答题与题目提取工具</span>
+                </div>
+                <div style="display:flex; align-items:center;">
+                    <span id="minimize-btn" style="cursor:pointer; font-size:20px; margin-right:10px; transition:transform 0.2s;">−</span>
+                    <span id="close-btn" style="cursor:pointer; font-size:20px; transition:transform 0.2s;">×</span>
                 </div>
             </div>
-            <div id="panel-content" style="display:flex; flex-direction:column; background:#f5f7fa;">
-                <div style="display:flex;">
-                    <button class="tab-btn active" data-tab="answer" style="flex:1; padding:10px; border:none; background:#409eff; color:white; cursor:pointer;">答题助手</button>
-                    <button class="tab-btn" data-tab="extract" style="flex:1; padding:10px; border:none; background:#e1e8ed; color:#333; cursor:pointer;">题目提取</button>
+            <div id="panel-content" style="display:flex; flex-direction:column; background:#f8f9fa;">
+                <div style="display:flex; position:relative; background:#f8f9fa;">
+                    <button class="tab-btn active" data-tab="answer" style="flex:1; padding:12px; border:none; background:transparent; color:#667eea; cursor:pointer; font-weight:500; position:relative; transition:all 0.3s;">答题助手</button>
+                    <button class="tab-btn" data-tab="extract" style="flex:1; padding:12px; border:none; background:transparent; color:#666; cursor:pointer; font-weight:500; position:relative; transition:all 0.3s;">题目提取</button>
+                    <div id="tab-indicator" style="position:absolute; bottom:0; left:0; height:3px; background:#667eea; transition:all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); width:50%;"></div>
                 </div>
-                <div id="tab-content" style="padding:12px; overflow:auto; max-height:400px;">
+                <div id="tab-content" style="padding:16px; overflow:auto; max-height:400px;">
                     <!-- 答题助手标签页内容 -->
                     <div id="answer-tab" class="tab-pane">
-                        <button id="upload-word-btn" style="width:100%; padding:8px; background:#FF9800; color:white; border:none; border-radius:4px; margin-bottom:8px; font-weight:500;">📄 上传Word文档</button>
-                        <textarea id="kb-input" placeholder="粘贴题库文本（支持足下教育标准格式）" style="width:100%; height:100px; margin-bottom:8px; padding:6px; border:1px solid #ccc; border-radius:4px; font-family:monospace; font-size:13px;"></textarea>
-                        <button id="parse-btn" style="width:100%; padding:6px; background:#409eff; color:white; border:none; border-radius:4px; margin-bottom:8px;">✅ 解析题库</button>
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 8px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef;">
-                            <span style="font-size: 13px; color: #495057; font-weight: 500;">题目确认</span>
-                            <label class="toggle-switch" style="position: relative; display: inline-block; width: 48px; height: 24px; margin: 0; cursor: pointer;">
-                                <input type="checkbox" id="disable-confirmation" style="opacity: 0; width: 0; height: 0; position: absolute;">
-                                <span class="toggle-slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #4CAF50; transition: .4s; border-radius: 24px;"></span>
-                            </label>
+                        <div style="margin-bottom:15px;">
+                            <button id="upload-word-btn" style="width:100%; padding:12px; background:linear-gradient(135deg, #FF9800 0%, #F57C00 100%); color:white; border:none; border-radius:8px; margin-bottom:12px; font-weight:500; font-size:14px; box-shadow:0 4px 6px rgba(255, 152, 0, 0.2); transition:all 0.3s; cursor:pointer;">📄 上传Word文档</button>
+                            <div style="position:relative;">
+                                <textarea id="kb-input" placeholder="粘贴题库文本（支持足下教育标准格式）" style="width:100%; height:120px; margin-bottom:12px; padding:12px; border:1px solid #ddd; border-radius:8px; font-family:monospace; font-size:13px; resize:vertical; transition:border-color 0.3s; box-sizing:border-box;"></textarea>
+                            </div>
+                            <button id="parse-btn" style="width:100%; padding:12px; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; border:none; border-radius:8px; margin-bottom:15px; font-weight:500; font-size:14px; box-shadow:0 4px 6px rgba(102, 126, 234, 0.2); transition:all 0.3s; cursor:pointer;">✅ 解析题库</button>
                         </div>
-                        <style>
-                            .toggle-switch .toggle-slider:before {
-                                position: absolute !important;
-                                content: "" !important;
-                                height: 18px !important;
-                                width: 18px !important;
-                                left: 3px !important;
-                                bottom: 3px !important;
-                                background-color: white !important;
-                                transition: .4s !important;
-                                border-radius: 50% !important;
-                            }
-                            .toggle-switch input:checked + .toggle-slider {
-                                background-color: #FFC107 !important;
-                            }
-                            .toggle-switch input:focus + .toggle-slider {
-                                box-shadow: 0 0 1px #FFC107 !important;
-                            }
-                            .toggle-switch input:checked + .toggle-slider:before {
-                                transform: translateX(24px) !important;
-                            }
-                        </style>
-                        <div id="kb-count" style="margin-bottom:6px; color:#666; font-size:12px;"></div>
-                        <div id="kb-full-list" style="font-size:12px; max-height:200px; overflow:auto; border:1px solid #eee; padding:6px; border-radius:4px; background:#fafafa;"></div>
+                        <div style="margin-bottom:15px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding: 12px; background: white; border-radius: 8px; border: 1px solid #e9ecef; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
+                                <span style="font-size: 14px; color: #495057; font-weight: 500; display:flex; align-items:center;">
+                                    <span style="margin-right:8px;">🔔</span> 题目确认
+                                </span>
+                                <label class="toggle-switch" style="position: relative; display: inline-block; width: 50px; height: 26px; margin: 0; cursor: pointer;">
+                                    <input type="checkbox" id="disable-confirmation" style="opacity: 0; width: 0; height: 0; position: absolute;">
+                                    <span class="toggle-slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #4CAF50; transition: .4s; border-radius: 26px;"></span>
+                                </label>
+                            </div>
+                            <style>
+                                .toggle-switch .toggle-slider:before {
+                                    position: absolute !important;
+                                    content: "" !important;
+                                    height: 20px !important;
+                                    width: 20px !important;
+                                    left: 3px !important;
+                                    bottom: 3px !important;
+                                    background-color: white !important;
+                                    transition: .4s !important;
+                                    border-radius: 50% !important;
+                                    box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+                                }
+                                .toggle-switch input:checked + .toggle-slider {
+                                    background-color: #FFC107 !important;
+                                }
+                                .toggle-switch input:focus + .toggle-slider {
+                                    box-shadow: 0 0 1px #FFC107 !important;
+                                }
+                                .toggle-switch input:checked + .toggle-slider:before {
+                                    transform: translateX(24px) !important;
+                                }
+                                /* 已提取题目列表样式 */
+                                .extracted-questions-container {
+                                    margin-top: 15px;
+                                    border: 1px solid #e9ecef;
+                                    border-radius: 8px;
+                                    background: white;
+                                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                                    overflow: hidden;
+                                }
+                                .extracted-questions-header {
+                                    display: flex;
+                                    justify-content: space-between;
+                                    align-items: center;
+                                    padding: 10px 15px;
+                                    background: #f8f9fa;
+                                    border-bottom: 1px solid #e9ecef;
+                                }
+                                .extracted-questions-title {
+                                    font-weight: 600;
+                                    color: #333;
+                                    font-size: 14px;
+                                    display: flex;
+                                    align-items: center;
+                                }
+                                .extracted-questions-title .icon {
+                                    margin-right: 8px;
+                                    color: #667eea;
+                                }
+                                .clear-extracted-btn {
+                                    background: #f44336;
+                                    color: white;
+                                    border: none;
+                                    padding: 5px 10px;
+                                    border-radius: 4px;
+                                    font-size: 12px;
+                                    cursor: pointer;
+                                    transition: all 0.2s;
+                                }
+                                .clear-extracted-btn:hover {
+                                    background: #d32f2f;
+                                    transform: translateY(-1px);
+                                    box-shadow: 0 2px 4px rgba(244, 67, 54, 0.3);
+                                }
+                                .extracted-questions-list {
+                                    max-height: 200px;
+                                    overflow-y: auto;
+                                    padding: 10px;
+                                }
+                                .extracted-question-item {
+                                    background: #f8f9fa;
+                                    border-radius: 6px;
+                                    padding: 10px;
+                                    margin-bottom: 8px;
+                                    border-left: 3px solid #667eea;
+                                    transition: all 0.2s;
+                                }
+                                .extracted-question-item:hover {
+                                    transform: translateY(-1px);
+                                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                                }
+                                .question-header {
+                                    display: flex;
+                                    align-items: center;
+                                    margin-bottom: 5px;
+                                    font-size: 12px;
+                                }
+                                .question-type-icon {
+                                    margin-right: 5px;
+                                }
+                                .question-type {
+                                    background: #667eea;
+                                    color: white;
+                                    padding: 2px 6px;
+                                    border-radius: 10px;
+                                    font-size: 10px;
+                                    margin-right: 8px;
+                                }
+                                .question-index {
+                                    color: #666;
+                                    font-weight: 600;
+                                }
+                                .question-text {
+                                    font-size: 13px;
+                                    margin-bottom: 5px;
+                                    color: #333;
+                                    line-height: 1.4;
+                                }
+                                .question-answer {
+                                    font-size: 12px;
+                                    display: flex;
+                                    align-items: center;
+                                }
+                                .answer-label {
+                                    color: #666;
+                                    margin-right: 5px;
+                                }
+                                .answer-value {
+                                    background: #e8f5e9;
+                                    color: #2e7d32;
+                                    padding: 2px 6px;
+                                    border-radius: 4px;
+                                    font-weight: 500;
+                                }
+                                .empty-state {
+                                    text-align: center;
+                                    color: #999;
+                                    padding: 20px;
+                                    font-size: 13px;
+                                }
+                                /* 动画效果和微交互 */
+                                @keyframes fadeIn {
+                                    from { opacity: 0; transform: translateY(10px); }
+                                    to { opacity: 1; transform: translateY(0); }
+                                }
+                                
+                                @keyframes slideIn {
+                                    from { transform: translateX(-20px); opacity: 0; }
+                                    to { transform: translateX(0); opacity: 1; }
+                                }
+                                
+                                @keyframes pulse {
+                                    0% { transform: scale(1); }
+                                    50% { transform: scale(1.05); }
+                                    100% { transform: scale(1); }
+                                }
+                                
+                                @keyframes shake {
+                                    0%, 100% { transform: translateX(0); }
+                                    25% { transform: translateX(-5px); }
+                                    75% { transform: translateX(5px); }
+                                }
+                                
+                                /* 面板进入动画 */
+                                #unified-control-panel {
+                                    animation: fadeIn 0.3s ease-out;
+                                }
+                                
+                                /* 标签页切换动画 */
+                                .tab-pane {
+                                    animation: fadeIn 0.3s ease-out;
+                                }
+                                
+                                /* 按钮点击效果 */
+                                button:active {
+                                    transform: scale(0.98) !important;
+                                    transition: transform 0.1s;
+                                }
+                                
+                                /* 进度条动画 */
+                                @keyframes progressPulse {
+                                    0% { background-position: 0% 50%; }
+                                    50% { background-position: 100% 50%; }
+                                    100% { background-position: 0% 50%; }
+                                }
+                                
+                                #extraction-progress {
+                                    background-size: 200% 200%;
+                                    animation: progressPulse 2s ease infinite;
+                                }
+                                
+                                /* 题目项进入动画 */
+                                .extracted-question-item {
+                                    animation: slideIn 0.3s ease-out;
+                                }
+                                
+                                /* 悬停效果增强 */
+                                .extracted-question-item:hover {
+                                    transform: translateY(-2px) scale(1.01);
+                                    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+                                    border-left-width: 4px;
+                                }
+                                
+                                /* 答题确认开关动画 */
+                                .toggle-switch input:checked + .toggle-slider {
+                                    animation: pulse 0.3s ease-out;
+                                }
+                                
+                                /* 文本框聚焦动画 */
+                                #kb-input:focus {
+                                    transform: translateY(-1px);
+                                    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.2);
+                                }
+                                
+                                /* 按钮悬停增强效果 */
+                                button:hover {
+                                    transform: translateY(-2px);
+                                    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+                                }
+                                
+                                /* 题库列表项悬停效果 */
+                                #kb-full-list > div:hover {
+                                    background-color: #f0f8ff;
+                                    border-radius: 4px;
+                                    padding: 4px;
+                                    margin: 4px 0;
+                                    transition: all 0.2s;
+                                }
+                                
+                                /* 通知提示动画 */
+                                @keyframes notificationSlide {
+                                    from { transform: translateY(-100%); opacity: 0; }
+                                    to { transform: translateY(0); opacity: 1; }
+                                }
+                                
+                                /* 加载动画 */
+                                @keyframes spin {
+                                    0% { transform: rotate(0deg); }
+                                    100% { transform: rotate(360deg); }
+                                }
+                                
+                                .loading-spinner {
+                                    display: inline-block;
+                                    width: 16px;
+                                    height: 16px;
+                                    border: 2px solid rgba(255,255,255,0.3);
+                                    border-radius: 50%;
+                                    border-top-color: white;
+                                    animation: spin 1s ease-in-out infinite;
+                                }
+                            </style>
+                        </div>
+                        <div id="kb-count" style="margin-bottom:10px; color:#666; font-size:13px; font-weight:500;"></div>
+                        <div id="kb-full-list" style="font-size:13px; max-height:300px; overflow-y:auto; border:1px solid #e9ecef; padding:12px; border-radius:8px; background:white; box-shadow:inset 0 1px 3px rgba(0,0,0,0.05);"></div>
                     </div>
                     <!-- 题目提取标签页内容 -->
                     <div id="extract-tab" class="tab-pane" style="display:none;">
-                        <div style="margin-bottom:10px;">
-                            <button id="auto-browse-btn" style="width:100%; padding:8px; background:#409eff; color:white; border:none; border-radius:4px; margin-bottom:8px;">🤖 自动遍历答案</button>
-                            <button id="show-questions-btn" style="width:100%; padding:8px; background:#4CAF50; color:white; border:none; border-radius:4px; margin-bottom:8px;">📋 显示题目列表</button>
+                        <div style="margin-bottom:15px;">
+                            <div style="margin-bottom:12px; padding:12px; background:#f0f8ff; border-radius:8px; border-left:4px solid #667eea;">
+                                <h4 style="margin:0 0 8px 0; color:#333; font-size:14px; font-weight:600;">🔍 题目提取工具</h4>
+                                <p style="margin:0; color:#666; font-size:12px; line-height:1.4;">使用自动遍历功能收集页面中的题目，或显示题目列表查看已提取的题目。</p>
+                            </div>
+                            <button id="auto-browse-btn" style="width:100%; padding:12px; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; border:none; border-radius:8px; margin-bottom:12px; font-weight:500; font-size:14px; box-shadow:0 4px 6px rgba(102, 126, 234, 0.2); transition:all 0.3s; cursor:pointer;">🤖 自动遍历答案</button>
+                            <button id="show-questions-btn" style="width:100%; padding:12px; background:linear-gradient(135deg, #4CAF50 0%, #388E3C 100%); color:white; border:none; border-radius:8px; margin-bottom:12px; font-weight:500; font-size:14px; box-shadow:0 4px 6px rgba(76, 175, 80, 0.2); transition:all 0.3s; cursor:pointer;">📋 显示题目列表</button>
+                            <button id="apply-questions-btn" style="width:100%; padding:12px; background:linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%); color:white; border:none; border-radius:8px; margin-bottom:12px; font-weight:500; font-size:14px; box-shadow:0 4px 6px rgba(156, 39, 176, 0.2); transition:all 0.3s; cursor:pointer;">📝 一键应用题目</button>
                         </div>
-                        <div id="extraction-status" style="padding:8px; background:#f0f0f0; border-radius:4px; font-size:12px;">
-                            等待开始提取题目...
+                        <div style="margin-bottom:15px;">
+                            <h4 style="margin:0 0 10px 0; color:#333; font-size:14px; font-weight:600;">提取状态</h4>
+                            <div id="extraction-status" style="padding:15px; background:white; border-radius:8px; border:1px solid #e9ecef; font-size:13px; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
+                                <div id="extraction-status-text">等待开始提取题目...</div>
+                                <div style="margin-top:10px; height:8px; background:#e9ecef; border-radius:4px; overflow:hidden;">
+                                    <div id="extraction-progress" style="height:100%; background:linear-gradient(90deg, #667eea 0%, #764ba2 100%); width:0%; transition:width 0.3s;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="extracted-questions-container" class="extracted-questions-container">
+                            <div class="extracted-questions-header">
+                                <div class="extracted-questions-title">
+                                    <span class="icon">📋</span>
+                                    已提取题目
+                                </div>
+                                <button id="clear-extracted-btn" class="clear-extracted-btn">清空</button>
+                            </div>
+                            <div id="extracted-questions-list" class="extracted-questions-list">
+                                <div class="empty-state">暂无已提取的题目</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -5291,23 +6064,23 @@
             const raw = panel.querySelector('#kb-input').value;
             if (!raw.trim()) return;
             KNOWLEDGE_BASE = parseRawText(raw);
-            
+
             // 保存为JSON格式
             const jsonKnowledgeBase = convertKnowledgeBaseToJSON(KNOWLEDGE_BASE);
             GM_setValue('knowledge_base_raw', JSON.stringify(jsonKnowledgeBase));
-            
+
             renderFullList();
         };
 
         // 题目确认开关事件
         const disableConfirmationCheckbox = panel.querySelector('#disable-confirmation');
-        
+
         // 从localStorage加载设置
         const savedDisableConfirmation = localStorage.getItem('disableConfirmation') === 'true';
         disableConfirmationCheckbox.checked = savedDisableConfirmation;
-        
+
         // 监听开关变化
-        disableConfirmationCheckbox.addEventListener('change', function() {
+        disableConfirmationCheckbox.addEventListener('change', function () {
             localStorage.setItem('disableConfirmation', this.checked);
             const statusMessage = this.checked ? '已关闭题目确认，将自动答题' : '已开启题目确认，答题前需要确认';
             showNotification(statusMessage, this.checked ? 'info' : 'success');
@@ -5326,6 +6099,94 @@
             }
         };
 
+        // 添加清空已提取题目列表的事件处理
+        panel.querySelector('#clear-extracted-btn').onclick = function() {
+            const btn = this;
+            const originalText = btn.innerHTML;
+            
+            if (confirm('确定要清空已提取的题目吗？此操作不可恢复。')) {
+                // 添加加载状态
+                btn.innerHTML = '<span class="loading-spinner"></span> 清空中...';
+                btn.disabled = true;
+                btn.style.opacity = '0.7';
+                btn.style.cursor = 'not-allowed';
+                
+                // 模拟加载效果
+                setTimeout(() => {
+                    // 清空已提取的题目缓存
+                    answerCache.clear();
+                    
+                    // 更新状态显示
+                    updateExtractionStatus();
+                    
+                    // 恢复按钮状态
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                    btn.style.cursor = 'pointer';
+                    
+                    // 显示通知
+                    showNotification('已清空已提取的题目', 'info');
+                }, 500);
+            }
+        };
+
+        // 添加"一键应用题目"按钮的事件处理
+        panel.querySelector('#apply-questions-btn').onclick = function() {
+            const btn = this;
+            const originalText = btn.innerHTML;
+            
+            if (storedQuestions.length === 0) {
+                showNotification('请先提取题目', 'warning');
+                return;
+            }
+            
+            // 添加加载状态
+            btn.innerHTML = '<span class="loading-spinner"></span> 处理中...';
+            btn.disabled = true;
+            btn.style.opacity = '0.7';
+            btn.style.cursor = 'not-allowed';
+            
+            // 模拟加载效果
+            setTimeout(() => {
+                // 格式化题目为题库文本
+                let formattedText = '';
+                storedQuestions.forEach((q, index) => {
+                    formattedText += `${index + 1}. ${q.question}\n`;
+                    
+                    // 添加选项
+                    q.options.forEach((opt, optIndex) => {
+                        const letter = String.fromCharCode(65 + optIndex); // A, B, C, D...
+                        formattedText += `${letter}. ${opt}\n`;
+                    });
+                    
+                    // 添加答案
+                    if (q.answer) {
+                        formattedText += `答案: ${q.answer}\n`;
+                    }
+                    
+                    formattedText += '\n';
+                });
+                
+                // 填充到答题助手的文本框
+                panel.querySelector('#kb-input').value = formattedText;
+                
+                // 切换到答题助手标签页
+                const answerTabBtn = panel.querySelector('.tab-btn[data-tab="answer"]');
+                if (answerTabBtn) {
+                    answerTabBtn.click();
+                }
+                
+                // 恢复按钮状态
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+                
+                showNotification('已将提取的题目应用到答题助手', 'success');
+            }, 800);
+        };
+
         // 初始化加载
         const saved = GM_getValue('knowledge_base_raw', '');
         if (saved) {
@@ -5335,7 +6196,7 @@
                 // 如果是对象，转换为JSON字符串
                 savedText = JSON.stringify(saved);
             }
-            
+
             // 检查是否为JSON格式
             if (savedText.trim().startsWith('{') && savedText.trim().endsWith('}')) {
                 try {
@@ -5359,43 +6220,14 @@
             renderFullList();
         }
 
-        // 更新题目提取状态
-        function updateExtractionStatus() {
-            const statusEl = panel.querySelector('#extraction-status');
-            const validQuestionIds = new Set(storedQuestions.map(q => q.id));
-            const filteredCache = Array.from(answerCache.entries()).filter(
-                ([qid]) => validQuestionIds.has(qid)
-            );
 
-            const total = storedQuestions.length;
-            const completed = filteredCache.reduce((count, [qid, opts]) => {
-                return count + (opts.length > 0 ? 1 : 0);
-            }, 0);
-
-            if (total > 0) {
-                statusEl.innerHTML = `
-                    <div>已检测到 <strong>${total}</strong> 道题目</div>
-                    <div>已提取答案 <strong>${completed}/${total}</strong> 道</div>
-                    <div style="margin-top:8px;">
-                        <div style="background:#e0e0e0; height:8px; border-radius:4px; overflow:hidden;">
-                            <div style="background:#4CAF50; height:100%; width:${(completed / total) * 100}%; transition:width 0.3s;"></div>
-                        </div>
-                    </div>
-                `;
-            } else {
-                statusEl.innerHTML = '等待开始提取题目...';
-            }
-        }
-
-        // 定期更新状态
-        setInterval(updateExtractionStatus, 1000);
     }
 
     // ========== 答题确认弹窗 ==========
     function showModal(question, matchedQ, answer) {
         // 检查是否禁用确认提示
         const disableConfirmation = localStorage.getItem('disableConfirmation') === 'true';
-        
+
         if (disableConfirmation) {
             // 如果禁用了确认提示，直接执行自动选择答案
             autoSelectAnswer(answer);
@@ -5442,9 +6274,43 @@
             resumeObserver();
         };
         modal.querySelector('#btn-confirm').onclick = () => {
-            modal.remove();
-            autoSelectAnswer(answer);
-            resumeObserver();
+            // 添加加载状态
+            const confirmBtn = modal.querySelector('#btn-confirm');
+            const originalText = confirmBtn.innerHTML;
+            confirmBtn.innerHTML = '<span class="loading-spinner"></span> 正在答题...';
+            confirmBtn.disabled = true;
+            confirmBtn.style.cursor = 'not-allowed';
+            confirmBtn.style.opacity = '0.7';
+            
+            // 添加加载动画样式（如果尚未添加）
+            if (!document.getElementById('btn-loading-style')) {
+                const style = document.createElement('style');
+                style.id = 'btn-loading-style';
+                style.textContent = `
+                    .loading-spinner {
+                        display: inline-block;
+                        width: 16px;
+                        height: 16px;
+                        border: 2px solid rgba(255,255,255,0.3);
+                        border-radius: 50%;
+                        border-top-color: white;
+                        animation: spin 0.8s ease-in-out infinite;
+                        margin-right: 8px;
+                        vertical-align: middle;
+                    }
+                    @keyframes spin {
+                        to { transform: rotate(360deg); }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            // 延迟执行答题操作，以显示加载动画
+            setTimeout(() => {
+                modal.remove();
+                autoSelectAnswer(answer);
+                resumeObserver();
+            }, 500);
         };
     }
 
@@ -7044,7 +7910,7 @@
                 const url = args[0];
                 if (typeof url === 'string') {
                     // 过滤掉关键API，不进行拦截处理
-                    if (url.includes('beginevaluate') || 
+                    if (url.includes('beginevaluate') ||
                         url.includes('studentevaluate') ||
                         url.includes('evaluation/api/studentevaluate')) {
                         // 直接调用原始fetch，不进行任何处理
@@ -7105,7 +7971,7 @@
                 try {
                     // 检查是否是需要过滤的关键API
                     if (this._url && (
-                        this._url.includes('beginevaluate') || 
+                        this._url.includes('beginevaluate') ||
                         this._url.includes('studentevaluate') ||
                         this._url.includes('evaluation/api/studentevaluate')
                     )) {
@@ -7209,12 +8075,12 @@
     // ========== 初始化 ==========
     function init() {
         // 添加全局错误处理
-        window.addEventListener('error', function(event) {
+        window.addEventListener('error', function (event) {
             // 过滤掉一些非关键错误
             if (event.message &&
                 (event.message.includes('GetKnowQuestionEvaluation') ||
-                 event.message.includes('JSON') ||
-                 event.message.includes('404'))) {
+                    event.message.includes('JSON') ||
+                    event.message.includes('404'))) {
                 console.warn('已过滤非关键错误:', event.message);
                 event.preventDefault();
                 return false;
@@ -7222,13 +8088,13 @@
         });
 
         // 添加未处理的Promise拒绝错误处理
-        window.addEventListener('unhandledrejection', function(event) {
+        window.addEventListener('unhandledrejection', function (event) {
             // 过滤掉API相关的错误
             if (event.reason &&
                 (event.reason.message &&
-                 (event.reason.message.includes('GetKnowQuestionEvaluation') ||
-                  event.reason.message.includes('JSON') ||
-                  event.reason.message.includes('404')))) {
+                    (event.reason.message.includes('GetKnowQuestionEvaluation') ||
+                        event.reason.message.includes('JSON') ||
+                        event.reason.message.includes('404')))) {
                 console.warn('已过滤Promise拒绝错误:', event.reason.message);
                 event.preventDefault();
                 return false;
@@ -7382,7 +8248,7 @@
                     const observer = new MutationObserver(checkStartConfirmation);
                     observer.observe(startModal, { attributes: true });
                 }
-                
+
                 // 启动观察器健康检查
                 startObserverHealthCheck();
             }, 2000); // 增加初始延迟，确保页面完全加载
@@ -7397,7 +8263,7 @@
                         const observer = new MutationObserver(checkStartConfirmation);
                         observer.observe(startModal, { attributes: true });
                     }
-                    
+
                     // 启动观察器健康检查
                     startObserverHealthCheck();
                 }, 1500);
