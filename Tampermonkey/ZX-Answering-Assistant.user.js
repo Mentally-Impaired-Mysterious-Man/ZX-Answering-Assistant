@@ -1,9 +1,10 @@
 // ==UserScript==
-// @name         ZX - 答题与题目提取工具（融合版）
-// @namespace    http://tampermonkey.net/
-// @version      5.0
-// @description  融合答题助手和题目提取工具，提供完整的答题和题目管理功能
+// @name         ZX-Answering-Assistant - 足下教育平台答题助手
+// @namespace    https://github.com/TianJiaJi/ZX-Answering-Assistant
+// @version      5.2
+// @description  专为足下教育平台(cqzuxia.com)设计的智能答题与题目提取工具，支持自动答题、题库管理、题目提取等功能
 // @author       TianJiaJi
+// @license      MIT
 // @match        https://ai.cqzuxia.com/#/evaluation/knowledge-detail/*
 // @match        *://admin.cqzuxia.com/*
 // @match        *://*.cqzuxia.com/*
@@ -13,12 +14,17 @@
 // @grant        GM_notification
 // @grant        none
 // @run-at       document-idle
+// @connect      github.com
+// @connect      jsdelivr.net
+// @connect      raw.githubusercontent.com
+// @require      https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js
 // @updateURL    https://raw.githubusercontent.com/TianJiaJi/ZX-Answering-Assistant/main/Tampermonkey/ZX-Answering-Assistant.user.js
 // @downloadURL  https://raw.githubusercontent.com/TianJiaJi/ZX-Answering-Assistant/main/Tampermonkey/ZX-Answering-Assistant.user.js
 // @updateURL    https://cdn.jsdelivr.net/gh/TianJiaJi/ZX-Answering-Assistant@main/Tampermonkey/ZX-Answering-Assistant.user.js
 // @downloadURL  https://cdn.jsdelivr.net/gh/TianJiaJi/ZX-Answering-Assistant@main/Tampermonkey/ZX-Answering-Assistant.user.js
-// @supportURL   https://github.com/TianJiaJi/ZX-Answering-Assistant/ZX-Answering-Assistant/issues
-// @homepage     https://github.com/TianJiaJi/ZX-Answering-Assistant/ZX-Answering-Assistant
+// @supportURL   https://github.com/TianJiaJi/ZX-Answering-Assistant/issues
+// @homepage     https://github.com/TianJiaJi/ZX-Answering-Assistant
+// @icon         https://github.com/TianJiaJi/ZX-Answering-Assistant/raw/main/Tampermonkey/assets/icon.png
 // ==/UserScript==
 
 (function () {
