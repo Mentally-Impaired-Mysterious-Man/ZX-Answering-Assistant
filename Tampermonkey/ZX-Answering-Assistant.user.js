@@ -13,12 +13,12 @@
 // @grant        GM_notification
 // @grant        none
 // @run-at       document-idle
-// @updateURL    https://raw.githubusercontent.com/yourusername/ZX-Answering-Assistant/main/Tampermonkey/ZX-Answering-Assistant.user.js
-// @downloadURL  https://raw.githubusercontent.com/yourusername/ZX-Answering-Assistant/main/Tampermonkey/ZX-Answering-Assistant.user.js
+// @updateURL    https://raw.githubusercontent.com/TianJiaJi/ZX-Answering-Assistant/main/Tampermonkey/ZX-Answering-Assistant.user.js
+// @downloadURL  https://raw.githubusercontent.com/TianJiaJi/ZX-Answering-Assistant/main/Tampermonkey/ZX-Answering-Assistant.user.js
 // @updateURL    https://cdn.jsdelivr.net/gh/TianJiaJi/ZX-Answering-Assistant@main/Tampermonkey/ZX-Answering-Assistant.user.js
 // @downloadURL  https://cdn.jsdelivr.net/gh/TianJiaJi/ZX-Answering-Assistant@main/Tampermonkey/ZX-Answering-Assistant.user.js
-// @supportURL   https://github.com/yourusername/ZX-Answering-Assistant/issues
-// @homepage     https://github.com/yourusername/ZX-Answering-Assistant
+// @supportURL   https://github.com/TianJiaJi/ZX-Answering-Assistant/ZX-Answering-Assistant/issues
+// @homepage     https://github.com/TianJiaJi/ZX-Answering-Assistant/ZX-Answering-Assistant
 // ==/UserScript==
 
 (function () {
