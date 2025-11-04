@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         ZX - 答题与题目提取工具（融合版）
 // @namespace    http://tampermonkey.net/
-// @version      4.0
+// @version      5.0
 // @description  融合答题助手和题目提取工具，提供完整的答题和题目管理功能
-// @author       You
+// @author       TianJiaJi
 // @match        https://ai.cqzuxia.com/#/evaluation/knowledge-detail/*
 // @match        *://admin.cqzuxia.com/*
 // @match        *://*.cqzuxia.com/*
