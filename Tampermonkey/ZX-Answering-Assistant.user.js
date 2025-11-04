@@ -12,6 +12,8 @@
 // @grant        GM_getValue
 // @grant        GM_xmlhttpRequest
 // @grant        GM_notification
+// @grant        GM_registerMenuCommand
+// @grant        GM_openInTab
 // @grant        none
 // @run-at       document-idle
 // @connect      github.com
@@ -902,18 +904,7 @@
                         </div>
                     </div>
                     
-                    <div id="extracted-questions-container" style="margin-top: 15px; display: none;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                            <div style="font-size: 13px; font-weight: 500; color: #333; display: flex; align-items: center; gap: 6px;">
-                                <span style="font-size: 16px;">📚</span>
-                                <span>已提取题目</span>
-                            </div>
-                            <button id="clear-extracted-btn" style="background: none; border: none; color: #6c757d; font-size: 12px; cursor: pointer; padding: 2px 6px; border-radius: 3px;">清空</button>
-                        </div>
-                        <div id="extracted-questions-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 6px; background: #fafafa; padding: 8px;">
-                            <!-- 题目列表将在这里动态生成 -->
-                        </div>
-                    </div>
+
                 </div>
             </div>
         `;
@@ -979,8 +970,22 @@
             if (!isDragging) return;
             const x = e.clientX - dragOffsetX;
             const y = e.clientY - dragOffsetY;
-            panel.style.left = x + 'px';
-            panel.style.top = y + 'px';
+            
+            // 获取窗口尺寸
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            const panelRect = panel.getBoundingClientRect();
+            
+            // 计算允许的位置范围，确保窗口不会超出可视区域
+            const maxX = windowWidth - panelRect.width;
+            const maxY = windowHeight - panelRect.height;
+            
+            // 限制窗口位置在可视区域内
+            const constrainedX = Math.max(0, Math.min(x, maxX));
+            const constrainedY = Math.max(0, Math.min(y, maxY));
+            
+            panel.style.left = constrainedX + 'px';
+            panel.style.top = constrainedY + 'px';
             panel.style.right = 'auto';
             panel.style.bottom = 'auto';
         });
@@ -1383,9 +1388,20 @@
         // 更新题目提取状态
         function updateExtractionStatus() {
             const statusEl = panel.querySelector('#extraction-status');
-            const progressBar = panel.querySelector('#extraction-progress');
-            const statusText = panel.querySelector('#extraction-status-text');
-            const extractedQuestionsContainer = panel.querySelector('#extracted-questions-container');
+            
+            // 尝试查找两种不同的进度条结构
+            let progressBar = panel.querySelector('#progress-bar');
+            let statusText = panel.querySelector('#status-content');
+            let progressBarContainer = panel.querySelector('#progress-bar-container');
+            let progressText = panel.querySelector('#progress-text');
+            
+            // 如果找不到第一种结构，尝试第二种结构
+            if (!progressBar || !statusText) {
+                progressBar = panel.querySelector('#extraction-progress');
+                statusText = panel.querySelector('#extraction-status-text');
+                progressBarContainer = progressBar ? progressBar.parentElement : null;
+                progressText = null; // 第二种结构没有单独的进度文本元素
+            }
             
             // 检查必要的DOM元素是否存在
             if (!progressBar || !statusText) {
@@ -1409,85 +1425,29 @@
                 progressBar.style.width = `${progressPercent}%`;
                 statusText.textContent = `已提取 ${completed}/${total} 道题目答案 (${progressPercent}%)`;
                 
-                // 更新已提取题目列表
-                if (extractedQuestionsContainer) {
-                    updateExtractedQuestionsList();
+                // 显示进度条容器（如果存在）
+                if (progressBarContainer) {
+                    progressBarContainer.style.display = 'block';
+                }
+                
+                // 更新进度文本（如果存在）
+                if (progressText) {
+                    progressText.textContent = `${progressPercent}%`;
                 }
             } else {
                 progressBar.style.width = '0%';
                 statusText.textContent = '等待开始提取题目...';
                 
-                // 清空已提取题目列表
-                if (extractedQuestionsContainer) {
-                    extractedQuestionsContainer.innerHTML = '<div class="empty-state">暂无已提取的题目</div>';
-                }
-            }
-        }
-        
-        // 更新已提取题目列表
-        function updateExtractedQuestionsList() {
-            const container = panel.querySelector('#extracted-questions-list');
-            if (!container) return;
-            
-            // 获取已提取答案的题目
-            const validQuestionIds = new Set(storedQuestions.map(q => q.id));
-            const filteredCache = Array.from(answerCache.entries()).filter(
-                ([qid, opts]) => validQuestionIds.has(qid) && opts.length > 0
-            );
-            
-            if (filteredCache.length === 0) {
-                container.innerHTML = '<div class="empty-state">暂无已提取的题目</div>';
-                return;
-            }
-            
-            // 生成题目列表HTML
-            let html = '';
-            filteredCache.forEach(([qid, opts], index) => {
-                const question = storedQuestions.find(q => q.id === qid);
-                if (!question) return;
-                
-                // 获取答案文本
-                const answerText = Array.isArray(opts) ? opts.join(', ') : opts;
-                
-                // 获取题目类型
-                let questionType = '未知';
-                let typeIcon = '📝';
-                if (question.options) {
-                    const optionCount = question.options.split('\n').length;
-                    if (optionCount > 2) {
-                        questionType = '多选题';
-                        typeIcon = '☑️';
-                    } else {
-                        questionType = '单选题';
-                        typeIcon = '⭕';
-                    }
-                } else if (question.answer === '√' || question.answer === '×') {
-                    questionType = '判断题';
-                    typeIcon = '✅';
+                // 隐藏进度条容器（如果存在）
+                if (progressBarContainer) {
+                    progressBarContainer.style.display = 'none';
                 }
                 
-                // 截取题目文本（前50个字符）
-                const shortQuestion = question.question.length > 50 
-                    ? question.question.substring(0, 50) + '...' 
-                    : question.question;
-                
-                html += `
-                    <div class="extracted-question-item" style="animation-delay: ${index * 0.1}s">
-                        <div class="question-header">
-                            <span class="question-type-icon">${typeIcon}</span>
-                            <span class="question-type">${questionType}</span>
-                            <span class="question-index">#${index + 1}</span>
-                        </div>
-                        <div class="question-text">${shortQuestion}</div>
-                        <div class="question-answer">
-                            <span class="answer-label">答案：</span>
-                            <span class="answer-value">${answerText}</span>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            container.innerHTML = html;
+                // 重置进度文本（如果存在）
+                if (progressText) {
+                    progressText.textContent = '0%';
+                }
+            }
         }
 
         // 定期更新状态
@@ -1580,6 +1540,10 @@
             setTimeout(() => {
                 modal.remove();
                 autoSelectAnswer(answer);
+                // 更新成功答题次数
+                if (typeof window.updateSuccessTimes === 'function') {
+                    window.updateSuccessTimes();
+                }
                 resumeObserver();
             }, 500);
         };
@@ -1775,6 +1739,10 @@
             if (successfulSelections === expectedSelections) {
                 // 全部选择成功
                 showNotification(`已成功选择答案: ${answerKey}`, 'success', 3000);
+                // 更新成功答题次数
+                if (typeof window.updateSuccessTimes === 'function') {
+                    window.updateSuccessTimes();
+                }
             } else if (successfulSelections > 0) {
                 // 部分选择成功
                 const failedKeys = failedSelections.map(r => r.key).join(', ');
@@ -1854,6 +1822,10 @@
                     console.log('自动作答模式：自动点击下一题按钮');
                     nextButton.click();
                     showNotification('已自动选择答案并进入下一题', 'success', 2000);
+                    // 更新成功答题次数
+                    if (typeof window.updateSuccessTimes === 'function') {
+                        window.updateSuccessTimes();
+                    }
                 } else {
                     console.log('未找到下一题按钮，可能已是最后一题');
                     showNotification('已自动选择答案，但未找到下一题按钮', 'warning', 3000);
@@ -3860,6 +3832,9 @@
         // 创建统一控制面板
         createUnifiedControlPanel();
 
+        // 初始化菜单命令
+        initMenuCommands();
+
         // 默认隐藏控制面板
         const panel = document.getElementById('unified-control-panel');
         if (panel) {
@@ -5109,6 +5084,190 @@
         showWordStatus('请上传Word文档', 'info');
     }
 
+    // 初始化菜单命令
+    function initMenuCommands() {
+        // 获取统计数据
+        const getStatistics = () => {
+            const successTimes = GM_getValue('setting_success_times', 0);
+            const questionCount = Object.keys(KNOWLEDGE_BASE).length;
+            const extractedCount = GM_getValue('extracted_questions_count', 0);
+            return { successTimes, questionCount, extractedCount };
+        };
+
+        // 更新成功答题次数
+        const updateSuccessTimes = () => {
+            const currentTimes = GM_getValue('setting_success_times', 0);
+            GM_setValue('setting_success_times', currentTimes + 1);
+        };
+
+        // 将函数暴露到全局作用域，以便其他地方调用
+        window.updateSuccessTimes = updateSuccessTimes;
+
+        // 显示控制面板
+        GM_registerMenuCommand('📚 显示控制面板', () => {
+            const panel = document.getElementById('unified-control-panel');
+            const floatingBtn = document.getElementById('floating-toggle-btn');
+            
+            if (panel) {
+                panel.style.display = 'block';
+                panel.style.animation = 'slideInUp 0.3s ease-out';
+                // 隐藏浮动按钮
+                if (floatingBtn) {
+                    floatingBtn.style.display = 'none';
+                }
+                setTimeout(() => {
+                    panel.style.animation = '';
+                }, 300);
+            }
+        });
+
+        // 显示统计信息
+        GM_registerMenuCommand('👀 使用统计', () => {
+            const stats = getStatistics();
+            const message = `
+使用统计信息：
+✅ 成功答题：${stats.successTimes} 次
+📚 题库题目：${stats.questionCount} 道
+🔍 已提取题目：${stats.extractedCount} 道
+            `.trim();
+            
+            GM_notification({
+                title: 'ZX-Answering-Assistant 统计',
+                text: message,
+                highlight: true,
+                timeout: 5000
+            });
+        });
+
+        // 清空题库
+        GM_registerMenuCommand('🗑️ 清空题库', () => {
+            if (confirm('确定要清空当前题库吗？此操作不可恢复！')) {
+                KNOWLEDGE_BASE = {};
+                GM_setValue('knowledge_base_raw', '');
+                
+                // 更新UI
+                const kbCount = document.getElementById('kb-count');
+                const kbFullList = document.getElementById('kb-full-list');
+                if (kbCount) kbCount.textContent = '题库已清空';
+                if (kbFullList) kbFullList.innerHTML = '';
+                
+                GM_notification({
+                    title: '题库已清空',
+                    text: '题库已成功清空，可以重新导入新题库',
+                    timeout: 3000
+                });
+            }
+        });
+
+        // 导出题库
+        GM_registerMenuCommand('💾 导出题库', () => {
+            GM_notification({
+                title: '功能开发中...',
+                text: '敬请期待!',
+                timeout: 3000
+            });
+        });
+
+        // 重置统计数据
+        GM_registerMenuCommand('🔄 重置统计', () => {
+            if (confirm('确定要重置所有统计数据吗？')) {
+                GM_setValue('setting_success_times', 0);
+                GM_setValue('extracted_questions_count', 0);
+                
+                GM_notification({
+                    title: '统计数据已重置',
+                    text: '所有使用统计已清零',
+                    timeout: 3000
+                });
+            }
+        });
+
+        // 重置脚本
+        GM_registerMenuCommand('🔥 重置脚本', () => {
+            if (confirm('确定要重置脚本吗？这将清除所有保存的数据和设置！')) {
+                // 清除所有GM_setValue保存的数据
+                GM_setValue('knowledge_base_raw', '');
+                GM_setValue('setting_success_times', 0);
+                GM_setValue('extracted_questions_count', 0);
+                
+                // 清除所有localStorage保存的数据
+                localStorage.removeItem('disableConfirmation');
+                localStorage.removeItem('autoAnswer');
+                localStorage.removeItem('traverseSpeed');
+                localStorage.removeItem('floatingBtnPosition');
+                localStorage.removeItem('panelMinimized');
+                
+                // 重置全局变量
+                KNOWLEDGE_BASE = {};
+                storedQuestions = [];
+                answerCache.clear();
+                isProcessingExtraction = false;
+                processingQueue = [];
+                currentProcessingIndex = 0;
+                traverseSpeed = 200;
+                
+                // 刷新页面以应用重置
+                GM_notification({
+                    title: '脚本已重置',
+                    text: '所有数据和设置已清除，页面即将刷新',
+                    timeout: 3000
+                });
+                
+                // 延迟刷新页面，让用户看到通知
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            }
+        });
+
+        // 切换自动答题模式
+        GM_registerMenuCommand('🤖 切换自动答题', () => {
+            const autoAnswerCheckbox = document.getElementById('auto-answer');
+            const disableConfirmationCheckbox = document.getElementById('disable-confirmation');
+            
+            if (autoAnswerCheckbox && disableConfirmationCheckbox) {
+                autoAnswerCheckbox.checked = !autoAnswerCheckbox.checked;
+                const isEnabled = autoAnswerCheckbox.checked;
+                
+                // 当启用自动答题时，强制启用关闭题目确认功能
+                if (isEnabled) {
+                    disableConfirmationCheckbox.checked = true;
+                    localStorage.setItem('disableConfirmation', 'true');
+                    
+                    // 禁用关闭题目确认选项的设置功能
+                    disableConfirmationCheckbox.disabled = true;
+                    disableConfirmationCheckbox.style.opacity = '0.5';
+                    disableConfirmationCheckbox.style.cursor = 'not-allowed';
+                    
+                    GM_notification({
+                        title: '自动答题模式',
+                        text: '已开启自动答题模式，已自动启用关闭题目确认',
+                        timeout: 3000
+                    });
+                } else {
+                    // 关闭自动答题时，恢复关闭题目确认选项的设置功能
+                    disableConfirmationCheckbox.disabled = false;
+                    disableConfirmationCheckbox.style.opacity = '1';
+                    disableConfirmationCheckbox.style.cursor = 'pointer';
+                    
+                    GM_notification({
+                        title: '自动答题模式',
+                        text: '已关闭自动答题模式',
+                        timeout: 3000
+                    });
+                }
+            }
+        });
+
+        // 帮助文档
+        GM_registerMenuCommand('❓ 使用帮助', () => {
+            GM_openInTab('https://github.com/TianJiaJi/ZX-Answering-Assistant/blob/main/README.md', {
+                active: true,
+                insert: true
+            });
+        });
+    }
+
     // 启动脚本
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
@@ -5779,115 +5938,7 @@
                                 .toggle-switch input:checked + .toggle-slider:before {
                                     transform: translateX(24px) !important;
                                 }
-                                /* 已提取题目列表样式 */
-                                .extracted-questions-container {
-                                    margin-top: 15px;
-                                    border: 1px solid #e9ecef;
-                                    border-radius: 8px;
-                                    background: white;
-                                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-                                    overflow: hidden;
-                                }
-                                .extracted-questions-header {
-                                    display: flex;
-                                    justify-content: space-between;
-                                    align-items: center;
-                                    padding: 10px 15px;
-                                    background: #f8f9fa;
-                                    border-bottom: 1px solid #e9ecef;
-                                }
-                                .extracted-questions-title {
-                                    font-weight: 600;
-                                    color: #333;
-                                    font-size: 14px;
-                                    display: flex;
-                                    align-items: center;
-                                }
-                                .extracted-questions-title .icon {
-                                    margin-right: 8px;
-                                    color: #667eea;
-                                }
-                                .clear-extracted-btn {
-                                    background: #f44336;
-                                    color: white;
-                                    border: none;
-                                    padding: 5px 10px;
-                                    border-radius: 4px;
-                                    font-size: 12px;
-                                    cursor: pointer;
-                                    transition: all 0.2s;
-                                }
-                                .clear-extracted-btn:hover {
-                                    background: #d32f2f;
-                                    transform: translateY(-1px);
-                                    box-shadow: 0 2px 4px rgba(244, 67, 54, 0.3);
-                                }
-                                .extracted-questions-list {
-                                    max-height: 200px;
-                                    overflow-y: auto;
-                                    padding: 10px;
-                                }
-                                .extracted-question-item {
-                                    background: #f8f9fa;
-                                    border-radius: 6px;
-                                    padding: 10px;
-                                    margin-bottom: 8px;
-                                    border-left: 3px solid #667eea;
-                                    transition: all 0.2s;
-                                }
-                                .extracted-question-item:hover {
-                                    transform: translateY(-1px);
-                                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                                }
-                                .question-header {
-                                    display: flex;
-                                    align-items: center;
-                                    margin-bottom: 5px;
-                                    font-size: 12px;
-                                }
-                                .question-type-icon {
-                                    margin-right: 5px;
-                                }
-                                .question-type {
-                                    background: #667eea;
-                                    color: white;
-                                    padding: 2px 6px;
-                                    border-radius: 10px;
-                                    font-size: 10px;
-                                    margin-right: 8px;
-                                }
-                                .question-index {
-                                    color: #666;
-                                    font-weight: 600;
-                                }
-                                .question-text {
-                                    font-size: 13px;
-                                    margin-bottom: 5px;
-                                    color: #333;
-                                    line-height: 1.4;
-                                }
-                                .question-answer {
-                                    font-size: 12px;
-                                    display: flex;
-                                    align-items: center;
-                                }
-                                .answer-label {
-                                    color: #666;
-                                    margin-right: 5px;
-                                }
-                                .answer-value {
-                                    background: #e8f5e9;
-                                    color: #2e7d32;
-                                    padding: 2px 6px;
-                                    border-radius: 4px;
-                                    font-weight: 500;
-                                }
-                                .empty-state {
-                                    text-align: center;
-                                    color: #999;
-                                    padding: 20px;
-                                    font-size: 13px;
-                                }
+
                                 /* 动画效果和微交互 */
                                 @keyframes fadeIn {
                                     from { opacity: 0; transform: translateY(10px); }
@@ -5940,12 +5991,12 @@
                                 }
                                 
                                 /* 题目项进入动画 */
-                                .extracted-question-item {
+                                .question-item {
                                     animation: slideIn 0.3s ease-out;
                                 }
                                 
                                 /* 悬停效果增强 */
-                                .extracted-question-item:hover {
+                                .question-item:hover {
                                     transform: translateY(-2px) scale(1.01);
                                     box-shadow: 0 4px 8px rgba(0,0,0,0.15);
                                     border-left-width: 4px;
@@ -6023,18 +6074,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div id="extracted-questions-container" class="extracted-questions-container">
-                            <div class="extracted-questions-header">
-                                <div class="extracted-questions-title">
-                                    <span class="icon">📋</span>
-                                    已提取题目
-                                </div>
-                                <button id="clear-extracted-btn" class="clear-extracted-btn">清空</button>
-                            </div>
-                            <div id="extracted-questions-list" class="extracted-questions-list">
-                                <div class="empty-state">暂无已提取的题目</div>
-                            </div>
-                        </div>
+
                     </div>
                 </div>
             </div>
@@ -6055,8 +6095,22 @@
             if (!isDragging) return;
             const x = e.clientX - dragOffsetX;
             const y = e.clientY - dragOffsetY;
-            panel.style.left = x + 'px';
-            panel.style.top = y + 'px';
+            
+            // 获取窗口尺寸
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            const panelRect = panel.getBoundingClientRect();
+            
+            // 计算允许的位置范围，确保窗口不会超出可视区域
+            const maxX = windowWidth - panelRect.width;
+            const maxY = windowHeight - panelRect.height;
+            
+            // 限制窗口位置在可视区域内
+            const constrainedX = Math.max(0, Math.min(x, maxX));
+            const constrainedY = Math.max(0, Math.min(y, maxY));
+            
+            panel.style.left = constrainedX + 'px';
+            panel.style.top = constrainedY + 'px';
             panel.style.right = 'auto';
             panel.style.bottom = 'auto';
         });
@@ -6176,38 +6230,6 @@
                 createQuestionPanel();
             } else {
                 alert('请先触发题目加载');
-            }
-        };
-
-        // 添加清空已提取题目列表的事件处理
-        panel.querySelector('#clear-extracted-btn').onclick = function() {
-            const btn = this;
-            const originalText = btn.innerHTML;
-            
-            if (confirm('确定要清空已提取的题目吗？此操作不可恢复。')) {
-                // 添加加载状态
-                btn.innerHTML = '<span class="loading-spinner"></span> 清空中...';
-                btn.disabled = true;
-                btn.style.opacity = '0.7';
-                btn.style.cursor = 'not-allowed';
-                
-                // 模拟加载效果
-                setTimeout(() => {
-                    // 清空已提取的题目缓存
-                    answerCache.clear();
-                    
-                    // 更新状态显示
-                    updateExtractionStatus();
-                    
-                    // 恢复按钮状态
-                    btn.innerHTML = originalText;
-                    btn.disabled = false;
-                    btn.style.opacity = '1';
-                    btn.style.cursor = 'pointer';
-                    
-                    // 显示通知
-                    showNotification('已清空已提取的题目', 'info');
-                }, 500);
             }
         };
 
