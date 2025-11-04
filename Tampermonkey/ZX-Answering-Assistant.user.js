@@ -12,6 +12,8 @@
 // @grant        GM_getValue
 // @grant        GM_xmlhttpRequest
 // @grant        GM_notification
+// @grant        GM_registerMenuCommand
+// @grant        GM_openInTab
 // @grant        none
 // @run-at       document-idle
 // @connect      github.com
@@ -1580,6 +1582,10 @@
             setTimeout(() => {
                 modal.remove();
                 autoSelectAnswer(answer);
+                // 更新成功答题次数
+                if (typeof window.updateSuccessTimes === 'function') {
+                    window.updateSuccessTimes();
+                }
                 resumeObserver();
             }, 500);
         };
@@ -1775,6 +1781,10 @@
             if (successfulSelections === expectedSelections) {
                 // 全部选择成功
                 showNotification(`已成功选择答案: ${answerKey}`, 'success', 3000);
+                // 更新成功答题次数
+                if (typeof window.updateSuccessTimes === 'function') {
+                    window.updateSuccessTimes();
+                }
             } else if (successfulSelections > 0) {
                 // 部分选择成功
                 const failedKeys = failedSelections.map(r => r.key).join(', ');
@@ -1854,6 +1864,10 @@
                     console.log('自动作答模式：自动点击下一题按钮');
                     nextButton.click();
                     showNotification('已自动选择答案并进入下一题', 'success', 2000);
+                    // 更新成功答题次数
+                    if (typeof window.updateSuccessTimes === 'function') {
+                        window.updateSuccessTimes();
+                    }
                 } else {
                     console.log('未找到下一题按钮，可能已是最后一题');
                     showNotification('已自动选择答案，但未找到下一题按钮', 'warning', 3000);
@@ -3860,6 +3874,9 @@
         // 创建统一控制面板
         createUnifiedControlPanel();
 
+        // 初始化菜单命令
+        initMenuCommands();
+
         // 默认隐藏控制面板
         const panel = document.getElementById('unified-control-panel');
         if (panel) {
@@ -5107,6 +5124,174 @@
 
         // 初始提示
         showWordStatus('请上传Word文档', 'info');
+    }
+
+    // 初始化菜单命令
+    function initMenuCommands() {
+        // 获取统计数据
+        const getStatistics = () => {
+            const successTimes = GM_getValue('setting_success_times', 0);
+            const questionCount = Object.keys(KNOWLEDGE_BASE).length;
+            const extractedCount = GM_getValue('extracted_questions_count', 0);
+            return { successTimes, questionCount, extractedCount };
+        };
+
+        // 更新成功答题次数
+        const updateSuccessTimes = () => {
+            const currentTimes = GM_getValue('setting_success_times', 0);
+            GM_setValue('setting_success_times', currentTimes + 1);
+        };
+
+        // 将函数暴露到全局作用域，以便其他地方调用
+        window.updateSuccessTimes = updateSuccessTimes;
+
+        // 显示控制面板
+        GM_registerMenuCommand('📚 显示控制面板', () => {
+            const panel = document.getElementById('unified-control-panel');
+            const floatingBtn = document.getElementById('floating-toggle-btn');
+            
+            if (panel) {
+                panel.style.display = 'block';
+                panel.style.animation = 'slideInUp 0.3s ease-out';
+                // 隐藏浮动按钮
+                if (floatingBtn) {
+                    floatingBtn.style.display = 'none';
+                }
+                setTimeout(() => {
+                    panel.style.animation = '';
+                }, 300);
+            }
+        });
+
+        // 显示统计信息
+        GM_registerMenuCommand('👀 使用统计', () => {
+            const stats = getStatistics();
+            const message = `
+使用统计信息：
+✅ 成功答题：${stats.successTimes} 次
+📚 题库题目：${stats.questionCount} 道
+🔍 已提取题目：${stats.extractedCount} 道
+            `.trim();
+            
+            GM_notification({
+                title: 'ZX-Answering-Assistant 统计',
+                text: message,
+                highlight: true,
+                timeout: 5000
+            });
+        });
+
+        // 清空题库
+        GM_registerMenuCommand('🗑️ 清空题库', () => {
+            if (confirm('确定要清空当前题库吗？此操作不可恢复！')) {
+                KNOWLEDGE_BASE = {};
+                GM_setValue('knowledge_base_raw', '');
+                
+                // 更新UI
+                const kbCount = document.getElementById('kb-count');
+                const kbFullList = document.getElementById('kb-full-list');
+                if (kbCount) kbCount.textContent = '题库已清空';
+                if (kbFullList) kbFullList.innerHTML = '';
+                
+                GM_notification({
+                    title: '题库已清空',
+                    text: '题库已成功清空，可以重新导入新题库',
+                    timeout: 3000
+                });
+            }
+        });
+
+        // 导出题库
+        GM_registerMenuCommand('💾 导出题库', () => {
+            const stats = getStatistics();
+            if (stats.questionCount === 0) {
+                GM_notification({
+                    title: '无法导出',
+                    text: '题库为空，没有可导出的内容',
+                    timeout: 3000
+                });
+                return;
+            }
+            
+            const jsonKnowledgeBase = convertKnowledgeBaseToJSON(KNOWLEDGE_BASE);
+            const dataStr = JSON.stringify(jsonKnowledgeBase, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `ZX-题库_${new Date().toISOString().slice(0, 10)}.json`;
+            link.click();
+            
+            URL.revokeObjectURL(url);
+            
+            GM_notification({
+                title: '题库已导出',
+                text: `成功导出 ${stats.questionCount} 道题目`,
+                timeout: 3000
+            });
+        });
+
+        // 重置统计数据
+        GM_registerMenuCommand('🔄 重置统计', () => {
+            if (confirm('确定要重置所有统计数据吗？')) {
+                GM_setValue('setting_success_times', 0);
+                GM_setValue('extracted_questions_count', 0);
+                
+                GM_notification({
+                    title: '统计数据已重置',
+                    text: '所有使用统计已清零',
+                    timeout: 3000
+                });
+            }
+        });
+
+        // 切换自动答题模式
+        GM_registerMenuCommand('🤖 切换自动答题', () => {
+            const autoAnswerCheckbox = document.getElementById('auto-answer');
+            const disableConfirmationCheckbox = document.getElementById('disable-confirmation');
+            
+            if (autoAnswerCheckbox && disableConfirmationCheckbox) {
+                autoAnswerCheckbox.checked = !autoAnswerCheckbox.checked;
+                const isEnabled = autoAnswerCheckbox.checked;
+                
+                // 当启用自动答题时，强制启用关闭题目确认功能
+                if (isEnabled) {
+                    disableConfirmationCheckbox.checked = true;
+                    localStorage.setItem('disableConfirmation', 'true');
+                    
+                    // 禁用关闭题目确认选项的设置功能
+                    disableConfirmationCheckbox.disabled = true;
+                    disableConfirmationCheckbox.style.opacity = '0.5';
+                    disableConfirmationCheckbox.style.cursor = 'not-allowed';
+                    
+                    GM_notification({
+                        title: '自动答题模式',
+                        text: '已开启自动答题模式，已自动启用关闭题目确认',
+                        timeout: 3000
+                    });
+                } else {
+                    // 关闭自动答题时，恢复关闭题目确认选项的设置功能
+                    disableConfirmationCheckbox.disabled = false;
+                    disableConfirmationCheckbox.style.opacity = '1';
+                    disableConfirmationCheckbox.style.cursor = 'pointer';
+                    
+                    GM_notification({
+                        title: '自动答题模式',
+                        text: '已关闭自动答题模式',
+                        timeout: 3000
+                    });
+                }
+            }
+        });
+
+        // 帮助文档
+        GM_registerMenuCommand('❓ 使用帮助', () => {
+            GM_openInTab('https://github.com/TianJiaJi/ZX-Answering-Assistant/blob/main/README.md', {
+                active: true,
+                insert: true
+            });
+        });
     }
 
     // 启动脚本
