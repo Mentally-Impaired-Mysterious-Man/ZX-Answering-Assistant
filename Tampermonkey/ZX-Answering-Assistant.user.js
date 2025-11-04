@@ -981,8 +981,22 @@
             if (!isDragging) return;
             const x = e.clientX - dragOffsetX;
             const y = e.clientY - dragOffsetY;
-            panel.style.left = x + 'px';
-            panel.style.top = y + 'px';
+            
+            // 获取窗口尺寸
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            const panelRect = panel.getBoundingClientRect();
+            
+            // 计算允许的位置范围，确保窗口不会超出可视区域
+            const maxX = windowWidth - panelRect.width;
+            const maxY = windowHeight - panelRect.height;
+            
+            // 限制窗口位置在可视区域内
+            const constrainedX = Math.max(0, Math.min(x, maxX));
+            const constrainedY = Math.max(0, Math.min(y, maxY));
+            
+            panel.style.left = constrainedX + 'px';
+            panel.style.top = constrainedY + 'px';
             panel.style.right = 'auto';
             panel.style.bottom = 'auto';
         });
@@ -5203,31 +5217,9 @@
 
         // 导出题库
         GM_registerMenuCommand('💾 导出题库', () => {
-            const stats = getStatistics();
-            if (stats.questionCount === 0) {
-                GM_notification({
-                    title: '无法导出',
-                    text: '题库为空，没有可导出的内容',
-                    timeout: 3000
-                });
-                return;
-            }
-            
-            const jsonKnowledgeBase = convertKnowledgeBaseToJSON(KNOWLEDGE_BASE);
-            const dataStr = JSON.stringify(jsonKnowledgeBase, null, 2);
-            const dataBlob = new Blob([dataStr], { type: 'application/json' });
-            const url = URL.createObjectURL(dataBlob);
-            
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `ZX-题库_${new Date().toISOString().slice(0, 10)}.json`;
-            link.click();
-            
-            URL.revokeObjectURL(url);
-            
             GM_notification({
-                title: '题库已导出',
-                text: `成功导出 ${stats.questionCount} 道题目`,
+                title: '功能开发中...',
+                text: '敬请期待!',
                 timeout: 3000
             });
         });
@@ -5243,6 +5235,44 @@
                     text: '所有使用统计已清零',
                     timeout: 3000
                 });
+            }
+        });
+
+        // 重置脚本
+        GM_registerMenuCommand('🔥 重置脚本', () => {
+            if (confirm('确定要重置脚本吗？这将清除所有保存的数据和设置！')) {
+                // 清除所有GM_setValue保存的数据
+                GM_setValue('knowledge_base_raw', '');
+                GM_setValue('setting_success_times', 0);
+                GM_setValue('extracted_questions_count', 0);
+                
+                // 清除所有localStorage保存的数据
+                localStorage.removeItem('disableConfirmation');
+                localStorage.removeItem('autoAnswer');
+                localStorage.removeItem('traverseSpeed');
+                localStorage.removeItem('floatingBtnPosition');
+                localStorage.removeItem('panelMinimized');
+                
+                // 重置全局变量
+                KNOWLEDGE_BASE = {};
+                storedQuestions = [];
+                answerCache.clear();
+                isProcessingExtraction = false;
+                processingQueue = [];
+                currentProcessingIndex = 0;
+                traverseSpeed = 200;
+                
+                // 刷新页面以应用重置
+                GM_notification({
+                    title: '脚本已重置',
+                    text: '所有数据和设置已清除，页面即将刷新',
+                    timeout: 3000
+                });
+                
+                // 延迟刷新页面，让用户看到通知
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
             }
         });
 
@@ -6240,8 +6270,22 @@
             if (!isDragging) return;
             const x = e.clientX - dragOffsetX;
             const y = e.clientY - dragOffsetY;
-            panel.style.left = x + 'px';
-            panel.style.top = y + 'px';
+            
+            // 获取窗口尺寸
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            const panelRect = panel.getBoundingClientRect();
+            
+            // 计算允许的位置范围，确保窗口不会超出可视区域
+            const maxX = windowWidth - panelRect.width;
+            const maxY = windowHeight - panelRect.height;
+            
+            // 限制窗口位置在可视区域内
+            const constrainedX = Math.max(0, Math.min(x, maxX));
+            const constrainedY = Math.max(0, Math.min(y, maxY));
+            
+            panel.style.left = constrainedX + 'px';
+            panel.style.top = constrainedY + 'px';
             panel.style.right = 'auto';
             panel.style.bottom = 'auto';
         });
