@@ -15,6 +15,8 @@
 // @run-at       document-idle
 // @updateURL    https://raw.githubusercontent.com/yourusername/ZX-Answering-Assistant/main/Tampermonkey/ZX-Answering-Assistant.user.js
 // @downloadURL  https://raw.githubusercontent.com/yourusername/ZX-Answering-Assistant/main/Tampermonkey/ZX-Answering-Assistant.user.js
+// @updateURL    https://cdn.jsdelivr.net/gh/yourusername/ZX-Answering-Assistant@latest/Tampermonkey/ZX-Answering-Assistant.user.js
+// @downloadURL  https://cdn.jsdelivr.net/gh/yourusername/ZX-Answering-Assistant@latest/Tampermonkey/ZX-Answering-Assistant.user.js
 // @supportURL   https://github.com/yourusername/ZX-Answering-Assistant/issues
 // @homepage     https://github.com/yourusername/ZX-Answering-Assistant
 // ==/UserScript==
