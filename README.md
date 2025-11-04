@@ -56,7 +56,7 @@
 
 1. 从 GitHub 复制代码
     1. 访问[ZX-Answering-Assistant](https://github.com/TianJiaJi/ZX-Answering-Assistant)
-    2. 复制 ZX-Answering-Assistant.user.js 代码或点击 [点击安装（前提以安装完暴力猴）]([https://github.com/TianJiaJi/ZX-Answering-Assistant](https://github.com/TianJiaJi/ZX-Answering-Assistant/raw/refs/heads/main/Tampermonkey/ZX-Answering-Assistant.user.js))
+    2. 复制 ZX-Answering-Assistant.user.js 代码或点击 [安装脚本](https://github.com/TianJiaJi/ZX-Answering-Assistant/raw/refs/heads/main/Tampermonkey/ZX-Answering-Assistant.user.js) （前提以安装完暴力猴）
 2. 点击浏览器右上角 插件 图标 → 选择「创建新脚本」
     
 ![pVORdlF](https://s21.ax1x.com/2025/10/22/pVORdlF.png "1")
